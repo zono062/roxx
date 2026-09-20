@@ -831,6 +831,65 @@ function computeDoubles(me,pt){
   return {total,runTotal,stationTotal,rox,lap,bottleneck,runGapSec,runSlower,division,need};
 }
 
+/* ============ TEAM（2〜4人） ============
+   2人＝ダブルス（ランは並走必須なので遅い方に合わせ、ステーションは分担）。
+   3〜4人＝リレー（交代制。ランもステーションも分け合う）。
+   RELAY_ROX は交代回数が増えるぶんのロクゾーン増加。いずれも推定値で、
+   日本大会の実データで較正するまで確定値として扱わない。 */
+const RELAY_ROX=1.12;
+
+/* 8本のランを人数で分ける（4人なら2本ずつ、3人なら3/3/2） */
+function splitLaps(n){
+  const base=Math.floor(8/n), rest=8%n;
+  return Array.from({length:n},(_,i)=>base+(i<rest?1:0));
+}
+
+/* 各ステーションを、一番速い人から順に埋めていく（1人あたりの担当数は均等） */
+function assignStations(members){
+  const n=members.length, cap=splitLaps(n); // ステーション数もランと同じ8
+  const load=members.map(()=>0);
+  const assign={};
+  ST_KEYS.forEach(k=>{
+    let best=-1,bestSec=Infinity;
+    members.forEach((m,i)=>{
+      if(load[i]>=cap[i]) return;
+      if(m.S[k]<bestSec){ bestSec=m.S[k]; best=i }
+    });
+    if(best<0) best=load.indexOf(Math.min(...load));
+    assign[k]=best; load[best]++;
+  });
+  return assign;
+}
+
+function computeTeam(members){
+  const n=members.length;
+  if(n===2) return {...computeDoubles(members[0],members[1]), members, mode:"doubles"};
+
+  const laps=splitLaps(n);
+  // ランが速い人に多く走ってもらう
+  const order=members.map((m,i)=>({i,lap:m.lap})).sort((a,b)=>a.lap-b.lap);
+  const lapOf=members.map(()=>0);
+  order.forEach((o,rank)=>{ lapOf[o.i]=laps[rank] });
+
+  const assign=assignStations(members);
+  const runTotal=members.reduce((x,m,i)=>x+m.lap*lapOf[i],0);
+  const stationTotal=ST_KEYS.reduce((x,k)=>x+members[assign[k]].S[k],0);
+  const rox=600*RELAY_ROX;
+  const total=runTotal+stationTotal+rox;
+
+  const per=members.map((m,i)=>({
+    name:i===0?"あなた":(m.name||"メンバー"+(i+1)),
+    laps:lapOf[i],
+    stations:ST_KEYS.filter(k=>assign[k]===i).map(k=>NAMES[k])
+  }));
+  const need=Math.max(...members.map(m=>m.need||0));
+  const sameSex=members.every(m=>m.sex===members[0].sex);
+  const division=n===4
+    ? (sameSex?(members[0].sex==="m"?"男子リレー":"女子リレー"):"ミックスリレー")
+    : n+"人チーム（非公式）";
+  return {total,runTotal,stationTotal,rox,need,division,per,members,mode:"relay"};
+}
+
 function ageFactor(a){return a<30?.97:a<40?1.00:a<50?1.06:a<60?1.15:1.26}
 
 function compute(a){
@@ -1626,56 +1685,74 @@ function closeWeek(){
 
 
 /* ---- ダブルスの表示 ---- */
-let PARTNER=null;
+let PARTNERS=[];                        // 自分以外のメンバー（最大3人）
+const TEAM_MAX=4;
 
-function partnerLabel(who,pt){ return who==="me" ? "あなた" : (pt.name||"相手") }
+function meMember(){ return {sex:A.sex,lap:R.lap,S:R.S,need:R.need,name:"あなた"} }
+function teamMembers(){ return [meMember(), ...PARTNERS] }
+function partnerLabel(who,pt){ return who==="me" ? "あなた" : ((pt&&pt.name)||"相手") }
 
 function renderDoubles(){
   const box=$("rPair"); if(!box) return;
   if(!R){ box.innerHTML=""; return }
 
-  if(!PARTNER){
+  if(!PARTNERS.length){
     box.innerHTML=`
-      <p class="pairlead">ダブルスはラン区間の<b>並走が必須</b>で、離れるとペナルティです。つまりタイムは遅い方に合わせて決まります。2人ぶんの結果を合わせると、<b>本番の予測タイムと、2人のうちどちらのどの種目が足を引っ張るか</b>が出ます。</p>
+      <p class="pairlead">2〜4人で出る場合の予測タイムも出せます。<b>2人ならダブルス</b>（ランは並走なので遅い方に合わせます）、<b>3〜4人ならリレー</b>（ランもステーションも分け合います）として計算します。</p>
       <button class="btn" onclick="invitePartner()">一緒に出る人を招待する</button>
       <p class="pairnote">相手に送るのは計算結果だけです。身長・体重・年齢は送られません。</p>`;
     return;
   }
 
-  const me={sex:A.sex,lap:R.lap,S:R.S,need:R.need};
-  const D=computeDoubles(me,PARTNER);
-  const rows=D.bottleneck.map((b,i)=>`
-    <div class="risk">
-      <div class="tag num">0${i+1}</div>
-      <div><b>${b.name}</b><p>${partnerLabel(b.slower,PARTNER)}の方が <strong>${ms(b.sec)}</strong> 遅い種目です。ここを詰めるとペア全体のタイムが最も動きます。</p></div>
+  const members=teamMembers();
+  const D=computeTeam(members);
+  const roster=members.map((m,i)=>`
+    <div class="urow">
+      <div class="uinfo"><b>${i===0?"あなた":esc(m.name||"メンバー"+(i+1))}</b><span>1kmラップ ${ms(m.lap)}</span></div>
+      ${i===0?"":`<button class="sobtn sm" onclick="removePartner(${i-1})">外す</button>`}
     </div>`).join("");
 
-  const runLine = D.runGapSec>60
-    ? `ランは${partnerLabel(D.runSlower,PARTNER)}のペースに合わせることになり、8本で <b>${ms(D.runGapSec)}</b> の差が出ています。並走が必須なので、ここは速い方が待つ形になります。`
-    : `2人のランペースはほぼ揃っています。並走のロスはほとんどありません。`;
+  let detail="";
+  if(D.mode==="doubles"){
+    const rows=D.bottleneck.map((b,i)=>`
+      <div class="risk">
+        <div class="tag num">0${i+1}</div>
+        <div><b>${b.name}</b><p>${partnerLabel(b.slower,PARTNERS[0])}の方が <strong>${ms(b.sec)}</strong> 遅い種目です。ここを詰めるとペア全体のタイムが動きます。</p></div>
+      </div>`).join("");
+    const runLine = D.runGapSec>60
+      ? `ランは${partnerLabel(D.runSlower,PARTNERS[0])}のペースに合わせることになり、8本で <b>${ms(D.runGapSec)}</b> の差が出ています。`
+      : `2人のランペースはほぼ揃っています。並走のロスはほとんどありません。`;
+    detail=`<p class="pairlead">${runLine}</p><h3 class="pairsub">2人で詰めるべき箇所</h3>${rows}`;
+  }else{
+    detail=`<h3 class="pairsub">担当の割り振り</h3>`+D.per.map(p=>`
+      <div class="risk">
+        <div class="tag num">${p.laps}</div>
+        <div><b>${esc(p.name)}</b><p>ラン ${p.laps}本／${p.stations.length?esc(p.stations.join("・")):"ステーションなし"}</p></div>
+      </div>`).join("")+
+      `<p class="pairnote">得意な種目を担当する形で割り振っています。</p>`;
+  }
 
   box.innerHTML=`
     <div class="pairhd">
       <div><span class="eyebrow">${D.division} 予測タイム</span>
       <div class="finish num" style="font-size:54px">${hms(D.total)}</div></div>
     </div>
-    <div class="pairwho"><span>あなた</span><b>＋</b><span>${PARTNER.name||"相手"}</span></div>
-    <p class="pairlead">${runLine}</p>
-    <h3 class="pairsub">2人で詰めるべき箇所</h3>
-    ${rows}
+    ${roster}
+    ${detail}
     <div class="gap" style="margin-top:16px">
-      <div class="gaprow"><span>2人に必要な準備</span><b class="num">${D.need}<small style="font-size:13px"> 週</small></b></div>
+      <div class="gaprow"><span>チームに必要な準備</span><b class="num">${D.need}<small style="font-size:13px"> 週</small></b></div>
       <div class="gapline"></div>
-      <div class="gapout" style="font-size:13.5px">準備週数は<b>長い方に合わせます。</b>片方だけ仕上がっても、ダブルスは揃わないと意味がないためです。</div>
+      <div class="gapout" style="font-size:13.5px">準備週数は<b>一番長い人に合わせます。</b>誰か1人が仕上がっても、チームは揃いません。</div>
     </div>
-    <button class="ghost" style="margin-top:14px" onclick="shareDoubles()">ペアの結果をシェアする</button>
-    <button class="redo" onclick="clearPartner()">別の相手で計算する</button>`;
+    ${PARTNERS.length<TEAM_MAX-1?`<button class="ghost" style="margin-top:14px" onclick="invitePartner()">メンバーを追加する（あと${TEAM_MAX-1-PARTNERS.length}人）</button>`:""}
+    <button class="ghost" style="margin-top:9px" onclick="shareDoubles()">チームの結果をシェアする</button>
+    <button class="redo" onclick="clearPartner()">メンバーを全員外す</button>`;
 }
 
 async function invitePartner(){
   const name=(prompt("あなたの表示名（相手の画面に出ます・省略可）")||"").trim();
   const url=SITE_URL+"?p="+encodeMe(name);
-  const text="HYROXにダブルスで出るなら、2人の予測タイムを出せます。\n8問answering するだけです。\n"+url;
+  const text="HYROXにチームで出るなら、2〜4人の予測タイムを出せます。\n8問に答えるだけです。\n"+url;
   track("pair_invite");
   if(navigator.share){
     try{ await navigator.share({text}); return }catch(e){ if(e&&e.name==="AbortError") return }
@@ -1685,16 +1762,16 @@ async function invitePartner(){
 }
 
 function shareDoubles(){
-  const me={sex:A.sex,lap:R.lap,S:R.S,need:R.need};
-  const D=computeDoubles(me,PARTNER);
+  const D=computeTeam(teamMembers());
   track("pair_share");
   const t=["ROXX 完走プログラム",D.division+" 予測タイム "+hms(D.total),
-           "2人に必要な準備 "+D.need+"週",SITE_URL].join("\n");
+           "チームに必要な準備 "+D.need+"週",SITE_URL].join("\n");
   if(navigator.share){ navigator.share({text:t}).catch(()=>{}) }
   else{ navigator.clipboard?.writeText(t); alert("結果をコピーしました") }
 }
 
-function clearPartner(){ PARTNER=null; Store.del("partner"); renderDoubles() }
+function removePartner(i){ PARTNERS.splice(i,1); Store.set("partners",PARTNERS); renderDoubles() }
+function clearPartner(){ PARTNERS=[]; Store.del("partners"); Store.del("partner"); renderDoubles() }
 
 /* 招待リンクから来た場合。自分の診断がまだなら保持して、診断後に合成する */
 function readPartnerFromURL(){
@@ -1703,8 +1780,10 @@ function readPartnerFromURL(){
     if(!q) return;
     const pt=decodePartner(q);
     history.replaceState({},"",location.pathname);
-    if(!pt){ return }
-    PARTNER=pt; Store.set("partner",pt);
+    if(!pt) return;
+    if(PARTNERS.length>=TEAM_MAX-1){ alert("メンバーは自分を入れて4人までです。"); return }
+    if(PARTNERS.some(x=>x.name===pt.name&&x.lap===pt.lap)) return;   // 同じリンクの二重取り込みを防ぐ
+    PARTNERS.push(pt); Store.set("partners",PARTNERS);
   }catch(e){}
 }
 
@@ -1733,13 +1812,17 @@ function validAnswers(o){
 }
 function restore(){
   readPartnerFromURL();
-  if(!PARTNER){ const sp=Store.get("partner"); if(sp&&sp.S&&sp.lap) PARTNER=sp }
+  if(!PARTNERS.length){
+    const arr=Store.get("partners");
+    if(Array.isArray(arr)) PARTNERS=arr.filter(x=>x&&x.S&&x.lap).slice(0,TEAM_MAX-1);
+    else { const sp=Store.get("partner"); if(sp&&sp.S&&sp.lap) PARTNERS=[sp] }   // 旧データの引き継ぎ
+  }
   const saved=Store.get("answers");
   if(!validAnswers(saved)){
-    if(PARTNER){
+    if(PARTNERS.length){
       const h=document.querySelector("#s-intro h1");
       const p=document.querySelector("#s-intro .hero p");
-      if(h) h.innerHTML=(PARTNER.name||"相手")+"さんと<br>ダブルスで出られるか。";
+      if(h) h.innerHTML=(PARTNERS[0].name||"相手")+"さんと<br>チームで出られるか。";
       if(p) p.textContent="先に8つの質問に答えてください。2人ぶんの結果がそろうと、ダブルスの予測タイムと、どちらのどの種目が足を引っ張るかが出ます。所要30秒。";
     }
     return false;
