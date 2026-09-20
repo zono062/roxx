@@ -23,6 +23,7 @@ let RECO = [];              // おすすめ（フォローしていない人の�
 let THREADS = [];
 let OPEN_THREAD = null;
 let MY_POSTS = [];
+let CP_MODE = "card";   // card=結果カード / photo=自分の写真 / text=テキストだけ
 let STORY_IX = 0;
 let STORY_TIMER = null;
 
@@ -207,7 +208,7 @@ function renderHome() {
 function postCard(p, isReco) {
   const sameRace = isReco && typeof A === "object" && A && p.race && p.race === A.race;
   return `
-    <article class="post${isReco ? " reco" : ""}">
+    <article class="post${isReco ? " reco" : ""}${p.url ? "" : " textpost"}">
       <header class="posthd">
         <div class="pauthor">
           ${avatarImg(p.author, 32)}
@@ -220,14 +221,15 @@ function postCard(p, isReco) {
           ? `<button class="sobtn sm" onclick="follow('${p.author_id}')">フォロー</button>`
           : `<button class="solink" onclick="postMenu('${p.id}','${p.author_id}')">…</button>`}
       </header>
-      ${p.url ? `<img class="postimg" src="${p.url}" alt="">` : ""}
+      ${p.url ? `<img class="postimg" src="${p.url}" alt="">`
+        : (p.caption ? `<p class="posttext">${escHtml(p.caption)}</p>` : "")}
       <div class="postact">
         <button class="likebtn ${p.liked ? "on" : ""}" onclick="toggleLike('${p.id}')">
           ${p.liked ? "♥" : "♡"} <span>${p.likes || 0}</span>
         </button>
         ${isReco ? `<button class="solink" onclick="openReport('story','${p.id}','この投稿')">通報</button>` : ""}
       </div>
-      ${p.caption ? `<p class="postcap"><b>${escHtml(p.author.display_name)}</b> ${escHtml(p.caption)}</p>` : ""}
+      ${p.url && p.caption ? `<p class="postcap"><b>${escHtml(p.author.display_name)}</b> ${escHtml(p.caption)}</p>` : ""}
     </article>`;
 }
 
@@ -407,55 +409,85 @@ function openCompose() {
 }
 
 /* 写真は既定の流れ。無い状態を「まだ選んでいない」として見せる */
+function setComposeMode(m) {
+  CP_MODE = m;
+  if (m === "photo" && !SHOT) { pickPhoto(); setTimeout(paintComposePhoto, 600); return }
+  paintComposePhoto();
+}
+
 function paintComposePhoto() {
   const box = elx("cpPhoto");
-  if (!box || !R) return;
-  box.innerHTML = SHOT
-    ? `<div class="cpshot"><img src="${SHOT.src}" alt=""></div>
-       <div class="cprow"><span>この写真を背景にします</span>
-         <button class="solink" onclick="pickPhoto();setTimeout(paintComposePhoto,600)">変える</button>
-         <button class="solink" onclick="clearPhoto();paintComposePhoto()">外す</button></div>`
-    : `<button class="cppick" onclick="pickPhoto();setTimeout(paintComposePhoto,600)">
-         <b>写真を選ぶ</b>
-         <em>自分の写真を背景にすると届きやすくなります。数字だけのカードは流されます。</em>
-       </button>
-       <div class="cprow"><span>選ばない場合は黒背景のカードになります</span></div>`;
-}
-function renderCompose() {
-  elx("soView").innerHTML = `
-    <div class="sopad">
-      <h3 class="soh">投稿する</h3>
-      ${R ? `
-      <div class="cpphoto" id="cpPhoto"></div>
-      <textarea class="authinput" id="cpCap" rows="3" maxlength="300" placeholder="ひとこと（任意）"></textarea>
-
-      <label class="cpcheck">
-        <input type="checkbox" id="cpPublic" checked>
-        <span><b>おすすめにも出す</b><em>フォロワー以外にも表示され、同じ大会を目標にしている人のフィードに届きます。外すとフォロワーだけになります。</em></span>
-      </label>
-      <button class="btn" id="cpPost" onclick="publish('post')">フィードに投稿する（残る）</button>
-
-      <div class="cpsep">または</div>
-      <button class="ghost" id="cpStory" onclick="publish('story')">ストーリーに出す</button>
-      <p class="authnote">ストーリーは<b>フォロワーだけ</b>が見られ、<b>24時間で自動的に消えます。</b>おすすめには出ません。<br>どちらも画像に身長・体重・年齢は含まれません。</p>`
-      : `<p class="somsg">先に診断を終えてください。結果が投稿の中身になります。</p>`}
+  if (!box) return;
+  const tabs = `
+    <div class="cpmodes">
+      ${[["card","カード"],["photo","写真"],["text","テキスト"]].map(([k,l]) =>
+        `<button class="cpmode${CP_MODE===k?" on":""}" onclick="setComposeMode('${k}')">${l}</button>`).join("")}
     </div>`;
+  if (CP_MODE === "text") {
+    box.innerHTML = `${tabs}<div class="cptextprev"><span>テキストだけの投稿になります</span></div>`;
+    return;
+  }
+  if (CP_MODE === "photo" && SHOT) {
+    box.innerHTML = `${tabs}<img class="cpimg" src="${SHOT.src}" alt="">
+      <div class="cptools">
+        <button class="cptool" onclick="pickPhoto();setTimeout(paintComposePhoto,600)">写真を変える</button>
+        <button class="cptool" onclick="clearPhoto();setComposeMode('card')">外す</button>
+      </div>`;
+    return;
+  }
+  if (CP_MODE === "photo") {
+    box.innerHTML = `${tabs}<button class="cpempty" onclick="pickPhoto();setTimeout(paintComposePhoto,600)">
+        <span class="cpemptyicon">▢</span><b>写真を選ぶ</b>
+        <em>自分の写真を背景にすると届きやすくなります</em></button>`;
+    return;
+  }
+  box.innerHTML = `${tabs}<div class="cpcardprev"><span>${R ? "診断結果のカードを投稿します" : "先に診断を終えてください"}</span></div>`;
+}
+
+function renderCompose() {
+  const gear=elx("soGear"); if(gear) gear.hidden=true;
+  if (!R && CP_MODE === "card") CP_MODE = "text";
+  // インスタの新規投稿と同じ並び：上部バー（キャンセル／タイトル／シェア）→ プレビュー → キャプション → 設定
+  elx("soView").innerHTML = `
+    <div class="cpbar">
+      <button class="cpcancel" onclick="goTab('home')">キャンセル</button>
+      <b>新規投稿</b>
+      <button class="cpshare" id="cpPost" onclick="publish('post')">シェア</button>
+    </div>
+    <div class="cppreview" id="cpPhoto"></div>
+    <div class="cpbody">
+      <textarea class="cpcap" id="cpCap" rows="3" maxlength="300" placeholder="キャプションを入力…"></textarea>
+      <label class="cprowopt">
+        <span>おすすめにも出す</span>
+        <input type="checkbox" id="cpPublic" checked>
+      </label>
+      <button class="cprowopt cpstorybtn" id="cpStory" onclick="publish('story')">
+        <span>ストーリーに出す<em>24時間で消えます</em></span>
+        <i>›</i>
+      </button>
+    </div>`;
+  paintComposePhoto();
 }
 
 async function publish(kind) {
   const cap = (elx("cpCap") ? elx("cpCap").value : "").trim();
   const btn = elx(kind === "story" ? "cpStory" : "cpPost");
-  if (btn) { btn.disabled = true; btn.textContent = "投稿しています…" }
+  const textOnly = CP_MODE === "text";
+  if (textOnly && !cap) { alert("本文を入力してください"); return }
+  if (textOnly && kind === "story") { alert("ストーリーには画像が必要です。カードか写真を選んでください。"); return }
+  if (btn) { btn.disabled = true; btn.textContent = "投稿中…" }
   try {
-    const canvas = await buildShareCard(null);
-    const blob = await new Promise(r => canvas.toBlob(r, "image/png"));
     const id = crypto.randomUUID();
-    const path = `${ME.id}/${id}.png`;
-    const { error: upErr } = await sb.storage.from(STORY_BUCKET)
-      .upload(path, blob, { contentType: "image/png", upsert: false });
-    if (upErr) throw upErr;
-
-    const caption = cap || `予測 ${hms(R.total)} ／ 必要 ${R.need}週`;
+    let path = null;
+    if (!textOnly) {
+      const canvas = await buildShareCard(null);
+      const blob = await new Promise(r => canvas.toBlob(r, "image/png"));
+      path = `${ME.id}/${id}.png`;
+      const { error: upErr } = await sb.storage.from(STORY_BUCKET)
+        .upload(path, blob, { contentType: "image/png", upsert: false });
+      if (upErr) throw upErr;
+    }
+    const caption = cap || (R ? `予測 ${hms(R.total)} ／ 必要 ${R.need}週` : "");
     const table = kind === "story" ? "stories" : "posts";
     const pub = elx("cpPublic") ? elx("cpPublic").checked : true;
     const row = kind === "story"
@@ -467,12 +499,11 @@ async function publish(kind) {
         };
     const { error } = await sb.from(table).insert(row);
     if (error) throw error;
-
-    if (typeof track === "function") track(kind === "story" ? "story_post" : "feed_post");
+    if (typeof track === "function") track(kind === "story" ? "story_post" : "feed_post", { mode: CP_MODE });
     goTab("home");
   } catch (e) {
     alert("投稿できませんでした：" + (e.message || e));
-    if (btn) { btn.disabled = false; btn.textContent = kind === "story" ? "ストーリーに出す（24時間で消える）" : "フィードに投稿する（残る）" }
+    if (btn) { btn.disabled = false; btn.textContent = kind === "story" ? "ストーリーに出す" : "シェア" }
   }
 }
 
