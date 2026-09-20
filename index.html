@@ -566,6 +566,12 @@ body.hastab .acctbar,body.hastab .foot{display:none}
 .notes[open]>summary::after{content:" －"}
 .notes .ctalegal,.notes .disc,.notes small{font-size:11px;line-height:1.7;opacity:.55}
 .foot-notes{border-top:none}
+
+/* 未ログインでタブを開いたときの案内 */
+.guestpane{padding:48px 20px;text-align:center}
+.guestlead{font-size:15px;font-weight:700;margin:0 0 6px}
+.guestsub{font-size:12px;opacity:.6;margin:0 0 18px}
+.guestpane .btn{max-width:260px;margin:0 auto}
 </style>
 </head>
 <body>
@@ -1599,7 +1605,11 @@ function restore(){
   renderResult();   // 生成演出はスキップして結果画面へ直行
   return true;
 }
-window.addEventListener("DOMContentLoaded",restore);
+window.addEventListener("DOMContentLoaded",()=>{
+  restore();
+  // 最初からタブUIを外枠にする（診断は「プログラム」タブの中身）
+  if(typeof enterShell==="function") enterShell();
+});
 
 /* ---- PWA: service worker（キャッシュのみの最小実装） ---- */
 if("serviceWorker" in navigator){

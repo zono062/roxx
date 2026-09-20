@@ -29,10 +29,11 @@ let STORY_TIMER = null;
    ログイン済みならアプリの外枠はタブになる。診断は「プログラム」タブの中身。
    診断がまだの人はフィードが空なので、プログラムから開く。 */
 function enterShell() {
-  if (!sb || !ME || !MY_PROFILE) return;
+  // 未ログインでもタブUIを外枠にする。診断は「プログラム」タブの中身。
   document.body.classList.add("hastab");
+  const signedIn = !!(sb && ME && MY_PROFILE);
   if (typeof routeFromHash === "function" && routeFromHash()) return;
-  goTab(R ? "home" : "program");
+  goTab(signedIn && R ? "home" : "program");
 }
 function leaveShell() {
   document.body.classList.remove("hastab");
@@ -60,6 +61,16 @@ function goTab(t) {
   }
   show("s-social");
   const v = elx("soView");
+  if (!sb || !ME || !MY_PROFILE) {
+    const label = { home: "みんなの投稿", find: "ユーザーを探す", dm: "メッセージ", me: "自分のページ" }[t] || "この機能";
+    v.innerHTML = `<div class="guestpane">
+      <p class="guestlead">${label}はログインすると使えます。</p>
+      <p class="guestsub">メールアドレスだけで登録できます。パスワードはありません。</p>
+      <button class="btn" onclick="goTab('program');setTimeout(()=>document.getElementById('acctbar')?.scrollIntoView({behavior:'smooth'}),200)">ログインする</button>
+    </div>`;
+    const sub0 = elx("soTopSub"); if (sub0) sub0.textContent = "";
+    return;
+  }
   v.scrollTop = 0;
   const sub = elx("soTopSub");
   if (sub) sub.textContent = { home: "", find: "さがす", dm: "メッセージ", me: MY_PROFILE ? "@" + MY_PROFILE.handle : "" }[t] || "";
