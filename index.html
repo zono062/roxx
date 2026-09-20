@@ -595,6 +595,27 @@ body.hastab .acctbar,body.hastab .foot{display:none}
 .uinfo{flex:1;min-width:0}
 .uinfo b{display:block;font-size:13px}
 .uinfo span{font-size:11px;opacity:.6}
+
+/* カレンダー */
+.calhd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.calhd b{font-size:14px}
+.ghost.sm{width:auto;padding:6px 12px;font-size:12px}
+.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.calhead i{font-size:10px;opacity:.5;text-align:center;font-style:normal;padding:4px 0}
+.calcell{position:relative;aspect-ratio:1/1;border:1px solid rgba(255,255,255,.10);background:transparent;color:inherit;border-radius:6px;padding:4px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px;cursor:pointer;font-size:11px}
+.calcell.empty{border:none;cursor:default}
+.calcell.has{border-color:rgba(255,255,255,.45)}
+.calcell.locked{opacity:.55}
+.calcell.today{outline:2px solid currentColor;outline-offset:-2px}
+.calcell.pick{background:rgba(255,255,255,.10)}
+.calcell.race{border-color:#e2483d}
+.caltag{font-size:8px;line-height:1.2;font-style:normal;opacity:.75;text-align:center;word-break:break-all}
+.calrace{font-size:8px;font-style:normal;color:#e2483d}
+.caldetail{margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,.12)}
+.caldetail>b{font-size:13px;display:block;margin-bottom:10px}
+.calday{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.calday b{font-size:15px}
+.calday em{font-size:12px;opacity:.6;font-style:normal}
 </style>
 </head>
 <body>
@@ -712,7 +733,7 @@ body.hastab .acctbar,body.hastab .foot{display:none}
 
 <nav class="tabbar">
   <button class="tabbtn on" data-tab="home" onclick="goTab('home')"><i>⌂</i><em>ホーム</em></button>
-  <button class="tabbtn" data-tab="find" onclick="goTab('find')"><i>⌕</i><em>さがす</em></button>
+  <button class="tabbtn" data-tab="cal" onclick="goTab('cal')"><i>▦</i><em>カレンダー</em></button>
   <button class="tabbtn tabadd" data-tab="post" onclick="openCompose()"><i>＋</i><em>投稿</em></button>
   <button class="tabbtn" data-tab="program" onclick="goTab('program')"><i>◎</i><em>プログラム</em></button>
   <button class="tabbtn" data-tab="me" onclick="goTab('me')"><i>◍</i><em>自分</em></button>
@@ -1443,6 +1464,111 @@ function paintWeek(){
   Store.set("log",LOG);
   Store.set("updated",Date.now());
 }
+/* ============ CALENDAR（生成メニューを日付に載せる） ============
+   週の練習日は日数から決める。3日なら火木土、6日なら月〜土。
+   第1週は中身を表示し、以降は課金状態に応じてロック表示にする。 */
+function esc(v){return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+const CAL_SLOTS={3:[2,4,6],4:[1,2,4,6],5:[1,2,4,5,0],6:[1,2,3,4,5,6]};
+let CAL_MONTH=null, CAL_PICK=null;
+
+function calSlots(){ return CAL_SLOTS[A.days] || CAL_SLOTS[3] }
+function ymd(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0") }
+function mondayOf(d){ const x=new Date(d); const w=(x.getDay()+6)%7; x.setDate(x.getDate()-w); x.setHours(0,0,0,0); return x }
+
+/* その日に割り当てられた練習（第何週の何日目か）を返す */
+function calPlanFor(date){
+  if(!R||!WEEK||!WEEK.length) return null;
+  const start=mondayOf(new Date());
+  const diff=Math.floor((mondayOf(date)-start)/(7*86400000));
+  if(diff<0) return null;
+  const slots=calSlots();
+  const idx=slots.indexOf(date.getDay());
+  if(idx<0||idx>=WEEK.length) return null;
+  return { week:diff+1, dayIndex:idx, day:WEEK[idx] };
+}
+
+function renderCalendar(){
+  const view=document.getElementById("soView");
+  if(!view) return;
+  if(!R){
+    view.innerHTML='<div class="guestpane"><p class="guestlead">まだ予定がありません。</p>'+
+      '<p class="guestsub">診断を終えると、あなたのメニューがカレンダーに入ります。</p>'+
+      '<button class="btn" onclick="goTab(\'program\')">診断をはじめる</button></div>';
+    return;
+  }
+  const base=CAL_MONTH?new Date(CAL_MONTH):new Date();
+  base.setDate(1); base.setHours(0,0,0,0);
+  CAL_MONTH=ymd(base);
+  const y=base.getFullYear(), m=base.getMonth();
+  const first=(new Date(y,m,1).getDay()+6)%7;        // 月曜始まり
+  const last=new Date(y,m+1,0).getDate();
+  const todayStr=ymd(new Date());
+  const race=RACES[A.race]; const raceStr=race&&race.date?race.date:null;
+
+  let cells="";
+  for(let i=0;i<first;i++) cells+='<div class="calcell empty"></div>';
+  for(let d=1;d<=last;d++){
+    const date=new Date(y,m,d);
+    const key=ymd(date);
+    const plan=calPlanFor(date);
+    const locked=plan&&plan.week>1&&!PAID;
+    const cls=["calcell"];
+    if(key===todayStr) cls.push("today");
+    if(plan) cls.push(locked?"locked":"has");
+    if(key===raceStr) cls.push("race");
+    const mark = key===raceStr ? '<em class="calrace">本番</em>'
+      : plan ? `<em class="caltag">${locked?"🔒":esc(plan.day.t).slice(0,6)}</em>` : "";
+    cells+=`<button class="${cls.join(" ")}" onclick="calPick('${key}')"><span>${d}</span>${mark}</button>`;
+  }
+
+  view.innerHTML=`
+    <div class="sopad">
+      <div class="calhd">
+        <button class="ghost sm" onclick="calShift(-1)">←</button>
+        <b>${y}年${m+1}月</b>
+        <button class="ghost sm" onclick="calShift(1)">→</button>
+      </div>
+      <div class="calgrid calhead">${["月","火","水","木","金","土","日"].map(w=>`<i>${w}</i>`).join("")}</div>
+      <div class="calgrid">${cells}</div>
+      <div id="calDetail"></div>
+    </div>`;
+  calPick(CAL_PICK&&CAL_PICK.startsWith(`${y}-${String(m+1).padStart(2,"0")}`)?CAL_PICK:todayStr);
+}
+
+function calShift(n){
+  const d=new Date(CAL_MONTH); d.setMonth(d.getMonth()+n); CAL_MONTH=ymd(d); renderCalendar();
+}
+
+function calPick(key){
+  CAL_PICK=key;
+  const box=document.getElementById("calDetail");
+  if(!box) return;
+  document.querySelectorAll(".calcell").forEach(c=>c.classList.remove("pick"));
+  const date=new Date(key+"T00:00:00");
+  const plan=calPlanFor(date);
+  const label=`${date.getMonth()+1}月${date.getDate()}日（${["日","月","火","水","木","金","土"][date.getDay()]}）`;
+  if(!plan){
+    box.innerHTML=`<div class="caldetail"><b>${label}</b><p class="somsg">この日は休養日です。</p></div>`;
+    return;
+  }
+  if(plan.week>1&&!PAID){
+    box.innerHTML=`<div class="caldetail"><b>${label}</b>
+      <p class="somsg">第${plan.week}週のメニューです。段階1に申し込むと開きます。</p>
+      <button class="btn" onclick="checkout()">段階1から始める</button></div>`;
+    return;
+  }
+  const d=plan.day;
+  const l=LOG[plan.dayIndex]||{state:"open"};
+  const state=l.state==="done"?"完了":l.state==="skip"?"できなかった":"未実施";
+  box.innerHTML=`<div class="caldetail">
+    <b>${label}　第${plan.week}週 DAY ${plan.dayIndex+1}</b>
+    <div class="calday"><b>${esc(d.t)}</b><em>${esc(d.n)}</em></div>
+    ${d.ex.map(([t,sub],i)=>`<div class="ex"><i>${i+1}</i><div><b>${t}</b><span>${sub||""}</span></div></div>`).join("")}
+    <p class="aim">${d.aim}</p>
+    <p class="somsg">状態：${state}（記録はプログラムタブで変更できます）</p>
+  </div>`;
+}
+
 function markDone(i){LOG[i].state="asking";paintWeek()}
 function setLvl(i,v){LOG[i].state="done";LOG[i].lvl=v;track("day_done",{day:i+1,level:v});paintWeek()}
 function markSkip(i){LOG[i].state="skip";LOG[i].lvl=null;paintWeek()}

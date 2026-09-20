@@ -62,8 +62,8 @@ function goTab(t) {
   }
   show("s-social");
   const v = elx("soView");
-  if (!sb || !ME || !MY_PROFILE) {
-    const label = { home: "みんなの投稿", find: "ユーザーを探す", dm: "メッセージ", me: "自分のページ" }[t] || "この機能";
+  if (t !== "cal" && (!sb || !ME || !MY_PROFILE)) {
+    const label = { home: "みんなの投稿", dm: "メッセージ", me: "自分のページ" }[t] || "この機能";
     v.innerHTML = `<div class="guestpane">
       <p class="guestlead">${label}はログインすると使えます。</p>
       <p class="guestsub">メールアドレスだけで登録できます。パスワードはありません。</p>
@@ -76,6 +76,7 @@ function goTab(t) {
   const sub = elx("soTopSub");
   if (sub) sub.textContent = { home: "", find: "さがす", dm: "メッセージ", me: MY_PROFILE ? "@" + MY_PROFILE.handle : "" }[t] || "";
   if (t === "home") { v.innerHTML = skeleton("読み込んでいます…"); loadHome(); loadNotifs() }
+  if (t === "cal")  { if (typeof renderCalendar === "function") renderCalendar(); return }
   if (t === "find") renderFind();
   if (t === "post") renderCompose();
   if (t === "dm")   { v.innerHTML = skeleton("読み込んでいます…"); loadThreads() }
