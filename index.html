@@ -1521,7 +1521,8 @@ function paintWeek(){
               <button onclick="setLvl(${i},3)">きつい</button>
             </div>`;
     }else if(l.state==="done"){
-      foot=`<div class="doneline"><span>✓ 完了 ／ ${LVLTXT[l.lvl]}</span><button onclick="reset(${i})">取り消す</button></div>`;
+      foot=`<div class="doneline"><span>✓ 完了 ／ ${LVLTXT[l.lvl]}</span><button onclick="reset(${i})">取り消す</button></div>
+            <button class="go" style="margin-top:8px" onclick="shareTraining(${i})">この記録を投稿する</button>`;
     }else{
       foot=`<div class="doneline"><span>— 未実施</span><button onclick="reset(${i})">取り消す</button></div>`;
     }
@@ -2030,6 +2031,109 @@ async function buildShareCard(before){
   x.fillText(SHARE_HOST, PAD+26, H-PAD-52);
   x.letterSpacing="0px";
   return c;
+}
+
+/* ============ やった内容のカード ============
+   予測タイムだけでは投稿する動機にならない。実施した中身（種目・量・
+   きつさ）と、今週どこまで進んだかを front に出す。 */
+async function buildTrainingCard(i){
+  await ensureFonts();
+  const d=WEEK[i], l=LOG[i]||{};
+  const W=1080,H=1350,PAD=84;
+  const c=document.createElement("canvas"); c.width=W; c.height=H;
+  const x=c.getContext("2d");
+  x.fillStyle="#0B0B0B"; x.fillRect(0,0,W,H);
+  if(SHOT){
+    drawCover(x,SHOT,W,H);
+    const g=x.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"rgba(11,11,11,.92)"); g.addColorStop(.45,"rgba(11,11,11,.42)");
+    g.addColorStop(.72,"rgba(11,11,11,.90)"); g.addColorStop(1,"rgba(11,11,11,.97)");
+    x.fillStyle=g; x.fillRect(0,0,W,H);
+  }
+  x.textAlign="left"; x.textBaseline="top"; x.fillStyle="#FFFFFF";
+  x.font='700 30px "Barlow Condensed", sans-serif'; x.letterSpacing="10px";
+  x.fillText("ROXX  /  完走プログラム", PAD, PAD);
+  x.strokeStyle="#2C2C2C"; x.lineWidth=2;
+  x.beginPath(); x.moveTo(PAD,PAD+58); x.lineTo(W-PAD,PAD+58); x.stroke();
+  x.letterSpacing="0px";
+
+  const today=new Date();
+  x.fillStyle="#8A8A85"; x.font='500 26px "IBM Plex Mono", monospace';
+  x.fillText(`第${Store.get("week")||1}週 DAY ${i+1}　${today.getMonth()+1}/${today.getDate()}`, PAD, PAD+118);
+
+  // 主役＝やった種目と量
+  let y=PAD+168;
+  x.fillStyle="#FFFFFF"; x.font='900 76px "Noto Sans JP", sans-serif';
+  wrapText(x,d.t,W-PAD*2).slice(0,2).forEach(line=>{ x.fillText(line,PAD,y); y+=92 });
+  x.fillStyle="#E5341F"; x.font='700 120px "Barlow Condensed", sans-serif';
+  x.fillText(d.n, PAD, y); y+=150;
+
+  // 中身（最大3行）
+  x.fillStyle="#D7D7D3"; x.font='500 34px "Noto Sans JP", sans-serif';
+  d.ex.slice(0,3).forEach(e=>{
+    const line = e[1] ? `${e[0]}　${e[1]}` : e[0];
+    wrapText(x,line,W-PAD*2).slice(0,1).forEach(t=>{ x.fillText(t,PAD,y); y+=52 });
+  });
+
+  const done=LOG.filter(v=>v.state==="done").length;
+  const rows=[["今週の実施", done+" / "+WEEK.length+" 日"]];
+  if(l.lvl) rows.push(["きつさ", LVLTXT[l.lvl]]);
+  if(R && R.left!==null) rows.push([RACES[A.race].label+"まで", R.left+" 週"]);
+  if(R) rows.push(["予測完走タイム", hms(R.total)]);
+
+  y=Math.max(y+40, H-PAD-190-rows.length*84);
+  rows.forEach(([k,v])=>{
+    x.strokeStyle="#2C2C2C"; x.lineWidth=1;
+    x.beginPath(); x.moveTo(PAD,y); x.lineTo(W-PAD,y); x.stroke();
+    x.fillStyle="#8A8A85"; x.font='500 28px "IBM Plex Mono", monospace';
+    x.textAlign="left"; x.fillText(k, PAD, y+26);
+    x.fillStyle="#FFFFFF"; x.font='900 40px "Noto Sans JP", sans-serif';
+    x.textAlign="right"; x.fillText(v, W-PAD, y+20);
+    x.textAlign="left"; y+=84;
+  });
+
+  x.fillStyle="#E5341F"; x.fillRect(PAD, H-PAD-56, 8, 46);
+  x.fillStyle="#FFFFFF"; x.font='700 34px "Barlow Condensed", sans-serif'; x.letterSpacing="6px";
+  x.fillText(SHARE_HOST, PAD+26, H-PAD-52); x.letterSpacing="0px";
+  return c;
+}
+
+function trainingText(i){
+  const d=WEEK[i], l=LOG[i]||{};
+  const done=LOG.filter(v=>v.state==="done").length;
+  const t=[`第${Store.get("week")||1}週 DAY ${i+1}　${d.t}　${d.n}`];
+  d.ex.slice(0,3).forEach(e=>t.push("・"+(e[1]?`${e[0]}（${e[1]}）`:e[0])));
+  t.push(`今週の実施 ${done}/${WEEK.length}日${l.lvl?"／きつさ "+LVLTXT[l.lvl]:""}`);
+  t.push(SITE_URL);
+  return t.join("\n");
+}
+
+/* 記録を共有する（OSの共有シート→インスタ等）。アプリ内投稿も選べる */
+async function shareTraining(i){
+  track("training_share",{day:i+1});
+  const text=trainingText(i);
+  let blob=null;
+  try{
+    const c=await buildTrainingCard(i);
+    blob=await new Promise(r=>c.toBlob(r,"image/png"));
+  }catch(e){}
+  if(blob && typeof ME==="object" && ME && typeof MY_PROFILE==="object" && MY_PROFILE
+     && confirm("ROXXのフィードにも投稿しますか？\n（キャンセルを押すと、他のアプリへの共有だけになります）")){
+    if(typeof publishTraining==="function"){ await publishTraining(blob,text,i); return }
+  }
+  if(blob){
+    const file=new File([blob],"roxx-training.png",{type:"image/png"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file],text}); return }catch(e){ if(e&&e.name==="AbortError") return }
+    }
+  }
+  if(navigator.share){ try{ await navigator.share({text}); return }catch(e){ if(e&&e.name==="AbortError") return } }
+  if(blob){
+    const url=URL.createObjectURL(blob); const a=document.createElement("a");
+    a.href=url; a.download="roxx-training.png"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
+  }
+  try{ await navigator.clipboard?.writeText(text) }catch(e){}
 }
 
 function shareText(before){

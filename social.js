@@ -476,6 +476,28 @@ async function publish(kind) {
   }
 }
 
+/* トレーニング記録をフィードに投稿する（画像は結果カードではなく実施内容） */
+async function publishTraining(blob, text, dayIndex) {
+  try {
+    const id = crypto.randomUUID();
+    const path = `${ME.id}/${id}.png`;
+    const { error: upErr } = await sb.storage.from(STORY_BUCKET)
+      .upload(path, blob, { contentType: "image/png", upsert: false });
+    if (upErr) throw upErr;
+    const caption = (text || "").split("\n").slice(0, 4).join("\n");
+    const { error } = await sb.from("posts").insert({
+      id, author_id: ME.id, image_path: path, kind: "training", caption,
+      visibility: "public",
+      race: (typeof A === "object" && A && A.race) ? A.race : null
+    });
+    if (error) throw error;
+    if (typeof track === "function") track("training_post", { day: (dayIndex ?? 0) + 1 });
+    goTab("home");
+  } catch (e) {
+    alert("投稿できませんでした：" + (e.message || e));
+  }
+}
+
 async function toggleLike(postId) {
   const p = POSTS.find(x => x.id === postId) || RECO.find(x => x.id === postId);
   if (!p) return;
