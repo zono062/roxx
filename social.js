@@ -51,6 +51,7 @@ function closeSocial() { goTab("program") }
 
 function goTab(t) {
   TAB = t;
+  const gear0 = elx("soGear"); if (gear0) gear0.hidden = (t !== "me");
   document.querySelectorAll(".tabbtn").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
   stopStory();
   window.scrollTo(0, 0);
@@ -595,7 +596,7 @@ async function sendMsg(id) {
 
 /* ---------- 自分 ---------- */
 async function renderMe() {
-  // インスタと同じ並び：アバター＋数値（投稿／フォロワー／フォロー中）→ 投稿グリッド → 設定
+  const gear=elx("soGear"); if(gear) gear.hidden=false;
   elx("soView").innerHTML = `<div class="sopad"><p class="somsg">読み込んでいます…</p></div>`;
   let myPosts = [], followers = 0, following = 0;
   try {
@@ -609,44 +610,71 @@ async function renderMe() {
     await Promise.all(myPosts.map(async x => { if (x.image_path) x.url = await signed(x.image_path) }));
   } catch (e) { console.error("renderMe failed", e) }
 
+  // 自己紹介は診断結果から作る（目標レースと予測タイム）
+  const bio = [];
+  if (typeof R === "object" && R && typeof A === "object" && A) {
+    const race = (typeof RACES === "object" && RACES[A.race]) ? RACES[A.race] : null;
+    if (race && race.date) bio.push(`${race.label}　${race.date.replace(/-/g, ".")}`);
+    if (R.total) bio.push(`予測 ${hms(R.total)}／必要な準備 ${R.need}週`);
+  }
+
   const grid = myPosts.length
     ? `<div class="megrid">${myPosts.map(p => `
         <button class="megcell" onclick="openPost('${p.id}')">
           ${p.url ? `<img src="${p.url}" alt="">` : `<span class="megtext">${escHtml((p.caption || "").slice(0, 40))}</span>`}
         </button>`).join("")}</div>`
-    : `<div class="guestpane">
-         <p class="guestlead">まだ投稿がありません。</p>
-         <p class="guestsub">トレーニングの記録を残すと、ここに並びます。</p>
-         <button class="btn" onclick="openCompose()">投稿する</button>
+    : `<div class="meempty">
+         <div class="meemptyicon">▦</div>
+         <p class="meemptylead">投稿はまだありません</p>
+         <p class="meemptysub">トレーニングの記録を残すと、ここに並びます。</p>
+         <button class="melink" onclick="openCompose()">最初の投稿をする</button>
        </div>`;
 
   elx("soView").innerHTML = `
-    <div class="sopad">
-      <div class="mehd">
-        <button class="meav" onclick="pickAvatar()">
-          ${avatarImg(MY_PROFILE, 76)}
-          <em>写真を変える</em>
-        </button>
+    <div class="mewrap">
+      <div class="mehead">
+        <button class="meavatar" onclick="pickAvatar()">${avatarImg(MY_PROFILE, 86)}</button>
         <div class="mestats">
           <div><b>${myPosts.length}</b><span>投稿</span></div>
           <div><b>${followers}</b><span>フォロワー</span></div>
           <div><b>${following}</b><span>フォロー中</span></div>
         </div>
       </div>
-      <div class="mename">
+      <div class="mebio">
         <b>${escHtml(MY_PROFILE.display_name)}</b>
-        <span>@${escHtml(MY_PROFILE.handle)}</span>
+        ${bio.map(l => `<span>${escHtml(l)}</span>`).join("")}
       </div>
+      <div class="meacts">
+        <button class="meact" onclick="pickAvatar()">プロフィールを編集</button>
+        <button class="meact" onclick="shareProfile()">シェア</button>
+      </div>
+      <div class="metabs"><button class="metab on">▦</button></div>
       ${grid}
-      <details class="notes" style="margin-top:24px">
-        <summary>通知と設定</summary>
-        <div id="pushState"></div>
-        <button class="ghost" style="margin-top:9px" onclick="goTab('program')">診断とトレーニングを見る</button>
-        <button class="ghost" style="margin-top:9px" onclick="openBlocked()">ブロックした人</button>
-        <button class="ghost" style="margin-top:9px" onclick="signOut();leaveShell()">ログアウト</button>
-        <p class="somsg" style="margin-top:14px">不快な投稿やメッセージは通報してください。内容を確認し、削除やアカウント停止を行います。</p>
-        <p class="somsg"><a href="./legal/privacy.html">プライバシーポリシー</a>　<a href="./legal/terms.html">利用規約</a></p>
-      </details>
+    </div>`;
+}
+
+/* プロフィールのリンクを共有する */
+async function shareProfile() {
+  const url = (typeof SITE_URL === "string" ? SITE_URL : location.href);
+  const text = `ROXX で HYROX の完走プログラムを作っています。\n@${MY_PROFILE.handle}\n${url}`;
+  if (navigator.share) { try { await navigator.share({ text }); return } catch (e) { if (e && e.name === "AbortError") return } }
+  try { await navigator.clipboard?.writeText(text); alert("コピーしました") } catch (e) { prompt("このリンクを共有してください", url) }
+}
+
+/* 設定（インスタと同じく右上から開く） */
+function renderSettings() {
+  elx("soView").innerHTML = `
+    <div class="sopad">
+      <button class="ghost sm" onclick="renderMe()">← 自分のページへ</button>
+      <h3 class="soh" style="margin-top:20px">通知</h3>
+      <div id="pushState"></div>
+      <h3 class="soh" style="margin-top:24px">設定</h3>
+      <button class="ghost" onclick="goTab('program')">診断とトレーニングを見る</button>
+      <button class="ghost" style="margin-top:9px" onclick="openBlocked()">ブロックした人</button>
+      <button class="ghost" style="margin-top:9px" onclick="signOut();leaveShell()">ログアウト</button>
+      <h3 class="soh" style="margin-top:24px">安全のために</h3>
+      <p class="somsg">不快な投稿やメッセージは通報してください。内容を確認し、削除やアカウント停止を行います。</p>
+      <p class="somsg"><a href="./legal/privacy.html">プライバシーポリシー</a>　<a href="./legal/terms.html">利用規約</a></p>
     </div>`;
   if (typeof paintPushState === "function") paintPushState();
 }

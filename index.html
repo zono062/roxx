@@ -616,6 +616,27 @@ body.hastab .acctbar,body.hastab .foot{display:none}
 .calday{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
 .calday b{font-size:15px}
 .calday em{font-size:12px;opacity:.6;font-style:normal}
+
+/* プロフィール（インスタ準拠のレイアウト） */
+.mewrap{padding:16px 16px 0}
+.mehead{display:flex;align-items:center;gap:22px;margin-bottom:14px}
+.meavatar{padding:0;border:0;background:none;flex:0 0 86px;width:86px;height:86px;border-radius:50%;overflow:hidden;cursor:pointer}
+.meavatar img,.meavatar>span{width:86px;height:86px;border-radius:50%;object-fit:cover;display:block}
+.mestats{flex:1;display:flex;justify-content:space-around;text-align:center}
+.mestats b{display:block;font-size:17px;font-weight:700;line-height:1.2}
+.mestats span{font-size:12px;opacity:.7}
+.mebio{margin-bottom:14px;line-height:1.55}
+.mebio b{display:block;font-size:13px;font-weight:700}
+.mebio span{display:block;font-size:12.5px;opacity:.75}
+.meacts{display:flex;gap:6px;margin-bottom:18px}
+.meact{flex:1;padding:8px 0;font-size:13px;font-weight:600;border-radius:8px;border:1px solid rgba(128,128,128,.35);background:rgba(128,128,128,.12);color:inherit;cursor:pointer}
+.metabs{display:flex;border-top:1px solid rgba(128,128,128,.25)}
+.metab{flex:1;padding:10px 0;background:none;border:0;border-bottom:2px solid currentColor;color:inherit;font-size:15px;cursor:pointer}
+.meempty{padding:56px 24px;text-align:center}
+.meemptyicon{font-size:34px;opacity:.35;margin-bottom:14px}
+.meemptylead{font-size:16px;font-weight:700;margin:0 0 4px}
+.meemptysub{font-size:12.5px;opacity:.65;margin:0 0 14px}
+.melink{background:none;border:0;color:#3d7dfb;font-size:13px;font-weight:700;cursor:pointer}
 </style>
 </head>
 <body>
@@ -704,8 +725,8 @@ body.hastab .acctbar,body.hastab .foot{display:none}
   </div>
 
   <div class="cta">
-    <div class="price" id="ctaPrice"><b class="num">¥980</b><span>／月・いつでも解約</span></div>
-    <button class="btn" id="ctaBtn" onclick="checkout()">段階1から始める</button>
+    <div class="price" id="ctaPrice"><span>第2週以降のメニューはまだ開いていません</span></div>
+    <button class="btn" id="ctaBtn" onclick="checkout()">プログラムを始める</button>
     <div class="photorow" id="photoState"></div>
     <button class="ghost" onclick="share()">結果を画像でシェアする</button>
     <details class="notes">
@@ -726,6 +747,7 @@ body.hastab .acctbar,body.hastab .foot{display:none}
         ♡<span class="bellct" id="bellCount" hidden>0</span>
       </button>
       <button class="bell" onclick="goTab('dm')" aria-label="メッセージ">✉</button>
+      <button class="bell" id="soGear" hidden onclick="renderSettings()" aria-label="設定">⚙</button>
     </div>
   </div>
   <div id="soView"></div>
@@ -1613,7 +1635,7 @@ function calPick(key){
   if(plan.week>1&&!PAID){
     box.innerHTML=`<div class="caldetail"><b>${label}</b>
       <p class="somsg">第${plan.week}週のメニューです。段階1に申し込むと開きます。</p>
-      <button class="btn" onclick="checkout()">段階1から始める</button></div>`;
+      <button class="btn" onclick="checkout()">プログラムを始める</button></div>`;
     return;
   }
   const d=plan.day;
