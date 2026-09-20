@@ -20,7 +20,7 @@
 <!-- OGP -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="ROXX">
-<meta property="og:title" content="ROXX — 出られるかどうかを、先に確かめる。">
+<meta property="og:title" content="ROXX — HYROX完走プログラム｜あなた専用の週次メニュー">
 <meta property="og:description" content="8つの質問で、予測完走タイム・本番で止まる箇所・必要な準備週数が出る。所要30秒・無料。">
 <meta property="og:url" content="https://zono062.github.io/hyrox-shindan/">
 <meta property="og:image" content="https://zono062.github.io/hyrox-shindan/ogp.png">
@@ -28,7 +28,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="ROXX — 出られるかどうかを、先に確かめる。">
+<meta name="twitter:title" content="ROXX — HYROX完走プログラム｜あなた専用の週次メニュー">
 <meta name="twitter:description" content="8つの質問で、予測完走タイム・本番で止まる箇所・必要な準備週数が出る。所要30秒・無料。">
 <meta name="twitter:image" content="https://zono062.github.io/hyrox-shindan/ogp.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -557,6 +557,15 @@ body.hastab .acctbar,body.hastab .foot{display:none}
   font-family:"Noto Sans JP",sans-serif;padding:6px 0;
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* 注釈は既定で畳む（読みたい人だけ開く） */
+.notes{margin:14px 0 0;border-top:1px solid rgba(255,255,255,.12);padding-top:10px}
+.notes>summary{list-style:none;cursor:pointer;font-size:12px;opacity:.6;padding:4px 0}
+.notes>summary::-webkit-details-marker{display:none}
+.notes>summary::after{content:" ＋";opacity:.6}
+.notes[open]>summary::after{content:" －"}
+.notes .ctalegal,.notes .disc,.notes small{font-size:11px;line-height:1.7;opacity:.55}
+.foot-notes{border-top:none}
 </style>
 </head>
 <body>
@@ -566,8 +575,8 @@ body.hastab .acctbar,body.hastab .foot{display:none}
 <section class="screen on" id="s-intro">
   <div class="hero">
     <div class="mark">ROXX / 完走プログラム</div>
-    <h1>出られるかどうかを、<br>先に確かめる。</h1>
-    <p>8つの質問に答えると、あなたの予測完走タイムと、本番で止まる箇所、そして間に合うかどうかが出ます。所要30秒。</p>
+    <h1>HYROX<br>完走プログラム</h1>
+    <p>身長・体重・年齢・いまの走力から、<b>あなた専用</b>のトレーニングを週単位で組みます。8つの質問、所要30秒。</p>
     <div class="spec">
       <div><span>レース構成</span><span>1km × 8 + 8ステーション</span></div>
       <div><span>次回開催</span><span>大阪 2027.01.21</span></div>
@@ -649,8 +658,11 @@ body.hastab .acctbar,body.hastab .foot{display:none}
     <button class="btn" id="ctaBtn" onclick="checkout()">段階1から始める</button>
     <div class="photorow" id="photoState"></div>
     <button class="ghost" onclick="share()">結果を画像でシェアする</button>
-    <p class="ctalegal">月額980円・自動更新／いつでも解約できます。お申し込み前に<a href="./legal/terms.html">利用規約</a>と<a href="./legal/tokushoho.html">特定商取引法に基づく表記</a>をご確認ください。</p>
-    <p class="disc">予測タイムは身長・体重・年齢・現在の走力から算出した参考値です。トレーニングおよび栄養に関する内容は一般的な情報であり、個別の医学的・栄養指導ではありません。</p>
+    <details class="notes">
+      <summary>料金と注意事項</summary>
+      <p class="ctalegal">月額980円・自動更新／いつでも解約できます。お申し込み前に<a href="./legal/terms.html">利用規約</a>と<a href="./legal/tokushoho.html">特定商取引法に基づく表記</a>をご確認ください。</p>
+      <p class="disc">予測タイムは身長・体重・年齢・現在の走力から算出した参考値です。トレーニングおよび栄養に関する内容は一般的な情報であり、個別の医学的・栄養指導ではありません。</p>
+    </details>
     <button class="redo" onclick="restartAll()">入力をやり直す</button>
   </div>
 </section>
@@ -676,7 +688,7 @@ body.hastab .acctbar,body.hastab .foot{display:none}
 
 <div id="storyView"></div>
 
-<section class="acctbar">
+<section class="acctbar" id="acctbar" hidden>
   <div class="eyebrow">アカウント</div>
   <div id="acct"></div>
 </section>
@@ -685,7 +697,10 @@ body.hastab .acctbar,body.hastab .foot{display:none}
   <a href="./legal/tokushoho.html">特定商取引法に基づく表記</a>
   <a href="./legal/privacy.html">プライバシーポリシー</a>
   <a href="./legal/terms.html">利用規約</a>
-  <small>&copy; ROXX ／ 本サービスは HYROX&reg; および Upsolut Sports GmbH とは一切関係のない非公式サービスです。HYROX は同社の登録商標です。</small>
+  <details class="notes foot-notes">
+    <summary>このサービスについて</summary>
+    <small>&copy; ROXX ／ 本サービスは HYROX&reg; および Upsolut Sports GmbH とは一切関係のない非公式サービスです。HYROX は同社の登録商標です。</small>
+  </details>
 </footer>
 
 </div>
@@ -842,7 +857,10 @@ const Q=[
 ];
 
 const $=id=>document.getElementById(id);
-const show=id=>{document.querySelectorAll(".screen").forEach(e=>e.classList.remove("on"));$(id).classList.add("on");window.scrollTo(0,0)};
+const show=id=>{document.querySelectorAll(".screen").forEach(e=>e.classList.remove("on"));$(id).classList.add("on");
+  // アカウント欄は結果を見たあとにだけ出す（最初の画面では情報量を増やさない）
+  const ab=$("acctbar"); if(ab) ab.hidden = !(id==="s-res"||id==="s-social");
+  window.scrollTo(0,0)};
 
 function start(){track("start_diagnosis");step=0;show("s-q");renderQ()}
 function prevQ(){if(step===0){show("s-intro")}else{step--;renderQ()}}
@@ -1019,10 +1037,9 @@ function renderResult(){
     ["now","0","現在地測定","診断で完了","",""],
     ["lock","1","完走ラインに乗る",`8kmを止まらず走れる状態へ`,p1+"週",""],
     ["lock","2","足切り3つを突破",`ソリ50m／WB100回／ラン8km`,p2+"週",""],
-    ["entry","3","エントリー",`ここまで${p1+p2}週。出るかどうかはここで決めます`,"",""],
-    ["lock","4","特異期",`ステーション直後に走る練習が中心`,p4+"週",""],
-    ["lock","5","テーパー",`量を55%に落として本番に合わせる`,"1週",""],
-    ["lock","6","当日の攻略",`動線・持ち物・ロクゾーンの削り方`,"",""]
+    ["lock","3","特異期",`ステーション直後に走る練習が中心`,p4+"週",""],
+    ["lock","4","テーパー",`量を55%に落として本番に合わせる`,"1週",""],
+    ["lock","5","当日の攻略",`動線・持ち物・ロクゾーンの削り方`,"",""]
   ];
   $("rRoad").innerHTML=road.map(([cls,n,title,sub,wk])=>`
     <div class="step ${cls}">
@@ -1181,7 +1198,7 @@ function testDay(env,km){
     ex:[["ソリ50m相当","傾斜早歩き3分×3 ／ 止まらず押し切れるか"],
         ["ウォールボール100回","20回×5に分割。合計タイムを記録"],
         [`ラン ${km}km`,"止まらず完走できるかを実測"]],
-    aim:`第4週は<b>測る週</b>です。3つとも通れば、ロードマップの段階3（エントリー）に進む判断材料が揃います。通らなかった項目が、次の4週間でやることそのものになります。`};
+    aim:`第4週は<b>測る週</b>です。3つとも通れば、ロードマップの段階3（特異期）に進む判断材料が揃います。通らなかった項目が、次の4週間でやることそのものになります。`};
 }
 
 function buildWeek(n){
@@ -1620,7 +1637,7 @@ function paintPhotoState(){
   const el=$("photoState"); if(!el) return;
   el.innerHTML = SHOT
     ? '<span>写真を背景に使います</span><button onclick="clearPhoto()">外す</button>'
-    : '<span>カードは黒背景です</span><button onclick="pickPhoto()">写真を選ぶ</button>';
+    : '<span>シェア画像に自分の写真を使えます</span><button onclick="pickPhoto()">写真を選ぶ</button>';
 }
 
 /* 短辺に合わせて中央でトリミング（カバー配置） */

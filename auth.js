@@ -210,11 +210,11 @@ function paintAccount() {
   }
   if (!ME) {
     box.innerHTML = `
-      <p class="authlead">アカウントを作ると、<b>端末を変えても記録が残ります。</b>パスワードはありません。メールに届くリンクを押すだけです。</p>
+      <p class="authlead">記録を残すなら、メールだけ。<b>パスワードは不要です。</b></p>
       <input class="authinput" id="authEmail" type="email" inputmode="email" autocomplete="email" placeholder="メールアドレス">
       <button class="btn" onclick="sendMagicLink()">ログイン用リンクを送る</button>
       <p class="authmsg" id="authMsg"></p>
-      <p class="authnote">身長・体重・年齢は本人しか見られない領域に保存されます。他の利用者に表示されることはありません。</p>`;
+      <details class="notes"><summary>保存されるデータについて</summary><p class="authnote">身長・体重・年齢は本人しか見られない領域に保存されます。他の利用者に表示されることはありません。</p></details>`;
     return;
   }
   if (!MY_PROFILE) {

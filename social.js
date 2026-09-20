@@ -78,6 +78,17 @@ const skeleton = t => `<p class="somsg">${t}</p>`;
 const POST_COLS = "id,author_id,image_path,caption,created_at,visibility,race";
 
 async function loadHome() {
+  // 取得に失敗したとき、読み込み表示のまま固まらないようにする
+  try {
+    await loadHomeInner();
+  } catch (e) {
+    console.error("loadHome failed", e);
+    const v = document.getElementById("soView");
+    if (v) v.innerHTML = `<p class="somsg">読み込めませんでした。通信状況をご確認のうえ、もう一度お試しください。</p>`;
+  }
+}
+
+async function loadHomeInner() {
   await loadFollowing();
   const now = new Date().toISOString();
   const followIds = FOLLOWING.map(f => f.id);
