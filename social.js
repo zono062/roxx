@@ -22,6 +22,7 @@ let POSTS = [];             // フォロー中の投稿
 let RECO = [];              // おすすめ（フォローしていない人の公開投稿）
 let THREADS = [];
 let OPEN_THREAD = null;
+let MY_POSTS = [];
 let STORY_IX = 0;
 let STORY_TIMER = null;
 
@@ -176,7 +177,13 @@ function renderHome() {
 
   const following = POSTS.length
     ? POSTS.map(p => postCard(p, false)).join("")
-    : `<p class="somsg">フォロー中の人の投稿はまだありません。下の「おすすめ」から気になる人をフォローしてください。</p>`;
+    : (RECO.length
+        ? `<p class="somsg">フォロー中の人の投稿はまだありません。下の「おすすめ」から気になる人をフォローしてください。</p>`
+        : `<div class="guestpane">
+             <p class="guestlead">まだ投稿がありません。</p>
+             <p class="guestsub">今日のトレーニングを載せると、同じ大会を目指す人に届きます。</p>
+             <button class="btn" onclick="openCompose()">最初の投稿をする</button>
+           </div>`);
 
   const reco = RECO.length ? `
     <div class="recohd">
@@ -281,14 +288,43 @@ function stopStory() {
 function renderFind() {
   elx("soView").innerHTML = `
     <div class="sopad">
-      <h3 class="soh">仲間を探す</h3>
-      <input class="authinput" id="soFind" type="text" placeholder="ユーザーID（例：mizuyuu0602）">
+      <input class="authinput" id="soFind" type="text" placeholder="ユーザーIDで探す（例：mizuyuu0602）">
       <button class="btn" onclick="searchUser()">探す</button>
       <div id="soFindOut"></div>
-      <h3 class="soh" style="margin-top:32px">フォロー中</h3>
+      <h3 class="soh" style="margin-top:28px">おすすめ</h3>
+      <div id="soReco">${skeleton("読み込んでいます…")}</div>
+      <h3 class="soh" style="margin-top:28px">フォロー中</h3>
       <div id="soList"></div>
     </div>`;
   loadFollowing().then(paintFollowing);
+  loadSuggested();
+}
+
+/* 同じ大会を目指している人を優先して出す（インスタの「おすすめ」に相当） */
+async function loadSuggested() {
+  const box = elx("soReco");
+  if (!box) return;
+  try {
+    await loadFollowing();
+    const exclude = [ME.id, ...FOLLOWING.map(f => f.id)];
+    const { data } = await sb.from("profiles")
+      .select("id,handle,display_name,sex,avatar_path")
+      .limit(30);
+    const rows = (data || []).filter(p => !exclude.includes(p.id)).slice(0, 10);
+    if (!rows.length) {
+      box.innerHTML = `<p class="somsg">まだ他の利用者がいません。投稿すると、あとから来た人のおすすめに出ます。</p>`;
+      return;
+    }
+    box.innerHTML = rows.map(p => `
+      <div class="urow">
+        <span class="uav">${avatarImg(p, 40)}</span>
+        <div class="uinfo"><b>${escHtml(p.display_name || "利用者")}</b><span>@${escHtml(p.handle || "")}</span></div>
+        <button class="sobtn sm" onclick="follow('${p.id}');this.textContent='フォロー中';this.disabled=true">フォロー</button>
+      </div>`).join("");
+  } catch (e) {
+    console.error("loadSuggested failed", e);
+    box.innerHTML = `<p class="somsg">おすすめを読み込めませんでした。</p>`;
+  }
 }
 
 async function loadFollowing() {
@@ -557,7 +593,32 @@ async function sendMsg(id) {
 }
 
 /* ---------- 自分 ---------- */
-function renderMe() {
+async function renderMe() {
+  // インスタと同じ並び：アバター＋数値（投稿／フォロワー／フォロー中）→ 投稿グリッド → 設定
+  elx("soView").innerHTML = `<div class="sopad"><p class="somsg">読み込んでいます…</p></div>`;
+  let myPosts = [], followers = 0, following = 0;
+  try {
+    const [{ data: ps }, { count: fr }, { count: fg }] = await Promise.all([
+      sb.from("posts").select(POST_COLS).eq("author_id", ME.id).order("created_at", { ascending: false }).limit(60),
+      sb.from("follows").select("*", { count: "exact", head: true }).eq("followee_id", ME.id),
+      sb.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", ME.id),
+    ]);
+    myPosts = ps || []; followers = fr || 0; following = fg || 0;
+    MY_POSTS = myPosts;
+    await Promise.all(myPosts.map(async x => { if (x.image_path) x.url = await signed(x.image_path) }));
+  } catch (e) { console.error("renderMe failed", e) }
+
+  const grid = myPosts.length
+    ? `<div class="megrid">${myPosts.map(p => `
+        <button class="megcell" onclick="openPost('${p.id}')">
+          ${p.url ? `<img src="${p.url}" alt="">` : `<span class="megtext">${escHtml((p.caption || "").slice(0, 40))}</span>`}
+        </button>`).join("")}</div>`
+    : `<div class="guestpane">
+         <p class="guestlead">まだ投稿がありません。</p>
+         <p class="guestsub">トレーニングの記録を残すと、ここに並びます。</p>
+         <button class="btn" onclick="openCompose()">投稿する</button>
+       </div>`;
+
   elx("soView").innerHTML = `
     <div class="sopad">
       <div class="mehd">
@@ -565,22 +626,39 @@ function renderMe() {
           ${avatarImg(MY_PROFILE, 76)}
           <em>写真を変える</em>
         </button>
-        <div>
-          <b>${escHtml(MY_PROFILE.display_name)}</b>
-          <span>@${escHtml(MY_PROFILE.handle)}</span>
+        <div class="mestats">
+          <div><b>${myPosts.length}</b><span>投稿</span></div>
+          <div><b>${followers}</b><span>フォロワー</span></div>
+          <div><b>${following}</b><span>フォロー中</span></div>
         </div>
       </div>
-      <h3 class="soh" style="margin-top:28px">通知</h3>
-      <div id="pushState"></div>
-      <h3 class="soh" style="margin-top:28px">設定</h3>
-      <button class="ghost" onclick="goTab('program')">診断とトレーニングを見る</button>
-      <button class="ghost" style="margin-top:9px" onclick="openBlocked()">ブロックした人</button>
-      <button class="ghost" style="margin-top:9px" onclick="signOut();leaveShell()">ログアウト</button>
-      <h3 class="soh" style="margin-top:28px">安全のために</h3>
-      <p class="somsg">不快な投稿やメッセージは通報してください。内容を確認し、削除やアカウント停止を行います。緊急のご連絡は mizuyuu0602@gmail.com へ。</p>
-      <p class="somsg"><a href="./legal/privacy.html">プライバシーポリシー</a>　<a href="./legal/terms.html">利用規約</a></p>
+      <div class="mename">
+        <b>${escHtml(MY_PROFILE.display_name)}</b>
+        <span>@${escHtml(MY_PROFILE.handle)}</span>
+      </div>
+      ${grid}
+      <details class="notes" style="margin-top:24px">
+        <summary>通知と設定</summary>
+        <div id="pushState"></div>
+        <button class="ghost" style="margin-top:9px" onclick="goTab('program')">診断とトレーニングを見る</button>
+        <button class="ghost" style="margin-top:9px" onclick="openBlocked()">ブロックした人</button>
+        <button class="ghost" style="margin-top:9px" onclick="signOut();leaveShell()">ログアウト</button>
+        <p class="somsg" style="margin-top:14px">不快な投稿やメッセージは通報してください。内容を確認し、削除やアカウント停止を行います。</p>
+        <p class="somsg"><a href="./legal/privacy.html">プライバシーポリシー</a>　<a href="./legal/terms.html">利用規約</a></p>
+      </details>
     </div>`;
   if (typeof paintPushState === "function") paintPushState();
+}
+
+/* プロフィールのグリッドから1件を開く */
+function openPost(id) {
+  const p = MY_POSTS.find(x => String(x.id) === String(id));
+  if (!p) return;
+  elx("soView").innerHTML = `
+    <div class="sopad">
+      <button class="ghost" style="margin-bottom:12px" onclick="renderMe()">← 自分のページへ</button>
+    </div>
+    ${postCard(p, false)}`;
 }
 
 async function openBlocked() {

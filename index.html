@@ -572,6 +572,29 @@ body.hastab .acctbar,body.hastab .foot{display:none}
 .guestlead{font-size:15px;font-weight:700;margin:0 0 6px}
 .guestsub{font-size:12px;opacity:.6;margin:0 0 18px}
 .guestpane .btn{max-width:260px;margin:0 auto}
+
+/* 右上のアイコン列（通知・DM）＝インスタと同じ位置 */
+.sotopR{display:flex;align-items:center;gap:6px}
+.tabadd i{font-size:20px;line-height:1}
+
+/* プロフィール：数値とグリッド（インスタ準拠） */
+.mestats{display:flex;gap:22px;align-items:center}
+.mestats div{text-align:center}
+.mestats b{display:block;font-size:16px}
+.mestats span{font-size:11px;opacity:.6}
+.mename{margin:12px 0 16px}
+.mename b{display:block;font-size:14px}
+.mename span{font-size:12px;opacity:.6}
+.megrid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
+.megcell{position:relative;aspect-ratio:1/1;padding:0;border:0;background:#111;overflow:hidden;cursor:pointer}
+.megcell img{width:100%;height:100%;object-fit:cover;display:block}
+.megtext{display:flex;width:100%;height:100%;align-items:center;justify-content:center;padding:8px;font-size:11px;opacity:.7;text-align:center}
+
+/* ユーザー行（おすすめ／検索結果） */
+.urow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+.uinfo{flex:1;min-width:0}
+.uinfo b{display:block;font-size:13px}
+.uinfo span{font-size:11px;opacity:.6}
 </style>
 </head>
 <body>
@@ -677,9 +700,12 @@ body.hastab .acctbar,body.hastab .foot{display:none}
 <section class="screen" id="s-social">
   <div class="sotop">
     <div class="sotopL"><b>ROXX</b><span class="sotopsub" id="soTopSub"></span></div>
-    <button class="bell" onclick="openNotifTab()" aria-label="お知らせ">
-      ♡<span class="bellct" id="bellCount" hidden>0</span>
-    </button>
+    <div class="sotopR">
+      <button class="bell" onclick="openNotifTab()" aria-label="お知らせ">
+        ♡<span class="bellct" id="bellCount" hidden>0</span>
+      </button>
+      <button class="bell" onclick="goTab('dm')" aria-label="メッセージ">✉</button>
+    </div>
   </div>
   <div id="soView"></div>
 </section>
@@ -687,8 +713,8 @@ body.hastab .acctbar,body.hastab .foot{display:none}
 <nav class="tabbar">
   <button class="tabbtn on" data-tab="home" onclick="goTab('home')"><i>⌂</i><em>ホーム</em></button>
   <button class="tabbtn" data-tab="find" onclick="goTab('find')"><i>⌕</i><em>さがす</em></button>
+  <button class="tabbtn tabadd" data-tab="post" onclick="openCompose()"><i>＋</i><em>投稿</em></button>
   <button class="tabbtn" data-tab="program" onclick="goTab('program')"><i>◎</i><em>プログラム</em></button>
-  <button class="tabbtn" data-tab="dm" onclick="goTab('dm')"><i>✉</i><em>DM</em></button>
   <button class="tabbtn" data-tab="me" onclick="goTab('me')"><i>◍</i><em>自分</em></button>
 </nav>
 
