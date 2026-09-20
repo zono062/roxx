@@ -638,6 +638,13 @@ async function renderMe() {
     const race = (typeof RACES === "object" && RACES[A.race]) ? RACES[A.race] : null;
     if (race && race.date) bio.push(`${race.label}　${race.date.replace(/-/g, ".")}`);
     if (R.total) bio.push(`予測 ${hms(R.total)}／必要な準備 ${R.need}週`);
+    if (typeof histStats === "function") {
+      const st = histStats();
+      if (st.sessions) {
+        const h = Math.round(st.minutes / 60 * 10) / 10;
+        bio.push(`実施 ${st.sessions}回・${h}時間${st.streak > 1 ? `／連続${st.streak}週` : ""}`);
+      }
+    }
   }
 
   const grid = myPosts.length

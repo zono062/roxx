@@ -637,6 +637,13 @@ body.hastab .acctbar,body.hastab .foot{display:none}
 .meemptylead{font-size:16px;font-weight:700;margin:0 0 4px}
 .meemptysub{font-size:12.5px;opacity:.65;margin:0 0 14px}
 .melink{background:none;border:0;color:#3d7dfb;font-size:13px;font-weight:700;cursor:pointer}
+
+/* 積み上げの帯 */
+.statstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:18px 0 6px;padding:14px 0;border-top:1px solid rgba(128,128,128,.25);border-bottom:1px solid rgba(128,128,128,.25);text-align:center}
+.statstrip b{display:block;font-size:20px;font-weight:700;line-height:1.1}
+.statstrip span{font-size:11px;opacity:.65}
+.calcell.donecell{border-color:rgba(226,72,61,.85)}
+.caldone{font-size:12px;font-style:normal;color:#e2483d;line-height:1}
 </style>
 </head>
 <body>
@@ -706,6 +713,7 @@ body.hastab .acctbar,body.hastab .foot{display:none}
   </div>
 
   <div class="sec">
+    <div id="rStats"></div>
     <h2>第1週にやること</h2>
     <div class="envtag" id="rEnv"></div>
     <div class="prog"><span>今週の実施</span><b class="num" id="pTxt">0 / 0</b></div>
@@ -1506,6 +1514,66 @@ function paintCta(){
 
 const LVLTXT={1:"楽だった",2:"ちょうどよかった",3:"きつかった"};
 
+/* ============ HISTORY（実施の履歴と積み上げ） ============
+   続ける仕組みとして効くことが分かっているのは、(1) 実施を記録して可視化
+   すること、(2) 直前の達成を見せて次の一歩を軽くすること（目標勾配）、
+   (3) いつ・どこで・何をやるかを事前に決めること（実行意図）。
+   ここでは (1)(2) を担う。日付つきの履歴を残し、積み上げと連続を出す。
+
+   休養日で途切れる「毎日連続」は、休養を処方している本プログラムと矛盾
+   するため採らない。週の目標日数を満たした週を数える「連続週」にする。 */
+function histAdd(i,lvl){
+  const d=WEEK[i]; if(!d) return;
+  const h=Store.get("history")||[];
+  const date=ymd(new Date());
+  const rec={date, week:Store.get("week")||1, dayIndex:i, title:d.t, minutes:parseInt(String(d.n).replace(/[^0-9]/g,""),10)||0, lvl:lvl||null};
+  const at=h.findIndex(x=>x.week===rec.week&&x.dayIndex===rec.dayIndex);
+  if(at>=0) h[at]=rec; else h.push(rec);
+  Store.set("history",h);
+}
+function histRemove(i){
+  const h=Store.get("history")||[];
+  const week=Store.get("week")||1;
+  Store.set("history", h.filter(x=>!(x.week===week&&x.dayIndex===i)));
+}
+function histStats(){
+  const h=Store.get("history")||[];
+  const sessions=h.length;
+  const minutes=h.reduce((x,r)=>x+(r.minutes||0),0);
+  const byWeek={};
+  h.forEach(r=>{ byWeek[r.week]=(byWeek[r.week]||0)+1 });
+  const target=(A&&A.days)?A.days:3;
+  // 直近の週から遡って、目標日数を満たした週が何週続いているか
+  const weeks=Object.keys(byWeek).map(Number).sort((a,b)=>b-a);
+  let streak=0;
+  const cur=Store.get("week")||1;
+  for(let w=cur; w>=1; w--){
+    if((byWeek[w]||0)>=target) streak++;
+    else if(w!==cur) break;             // 今週はまだ途中なので切らない
+    else continue;
+  }
+  const since=new Date(); since.setDate(since.getDate()-6);
+  const last7=h.filter(r=>new Date(r.date+"T00:00:00")>=since).length;
+  return {sessions,minutes,streak,last7,target};
+}
+function histDates(){
+  const h=Store.get("history")||[];
+  return new Set(h.map(r=>r.date));
+}
+function paintStats(){
+  const el=$("rStats"); if(!el) return;
+  const s=histStats();
+  if(!s.sessions){ el.innerHTML=""; return }
+  const hours=Math.floor(s.minutes/60), mins=s.minutes%60;
+  el.innerHTML=`
+    <div class="statstrip">
+      <div><b>${s.sessions}</b><span>実施</span></div>
+      <div><b>${hours?hours+"h":""}${mins?mins+"m":(hours?"":"0m")}</b><span>合計時間</span></div>
+      <div><b>${s.streak}</b><span>連続週</span></div>
+      <div><b>${s.last7}</b><span>直近7日</span></div>
+    </div>`;
+}
+
 function paintWeek(){
   $("rWeek").innerHTML=WEEK.map((d,i)=>{
     const l=LOG[i];
@@ -1544,6 +1612,7 @@ function paintWeek(){
   $("rClose").innerHTML = (settled===WEEK.length && !closed)
     ? `<button class="btn" onclick="closeWeek()">第1週を締めて、来週の調整を見る</button>` : "";
   Store.set("log",LOG);
+  paintStats();
   Store.set("updated",Date.now());
 }
 /* ============ CALENDAR（生成メニューを日付に載せる） ============
@@ -1551,7 +1620,7 @@ function paintWeek(){
    第1週は中身を表示し、以降は課金状態に応じてロック表示にする。 */
 function esc(v){return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 const CAL_SLOTS={3:[2,4,6],4:[1,2,4,6],5:[1,2,4,5,0],6:[1,2,3,4,5,6]};
-let CAL_MONTH=null, CAL_PICK=null;
+let CAL_MONTH=null, CAL_PICK=null, calDone=null;
 
 function calSlots(){ return CAL_SLOTS[A.days] || CAL_SLOTS[3] }
 function ymd(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0") }
@@ -1570,6 +1639,7 @@ function calPlanFor(date){
 }
 
 function renderCalendar(){
+  calDone=null;
   const view=document.getElementById("soView");
   if(!view) return;
   if(!R){
@@ -1598,7 +1668,11 @@ function renderCalendar(){
     if(key===todayStr) cls.push("today");
     if(plan) cls.push(locked?"locked":"has");
     if(key===raceStr) cls.push("race");
+    const doneDates=calDone||(calDone=histDates());
+    const isDone=doneDates.has(key);
+    if(isDone) cls.push("donecell");
     const mark = key===raceStr ? '<em class="calrace">本番</em>'
+      : isDone ? '<em class="caldone">✓</em>'
       : plan ? `<em class="caltag">${locked?"🔒":esc(plan.day.t).slice(0,6)}</em>` : "";
     cells+=`<button class="${cls.join(" ")}" onclick="calPick('${key}')"><span>${d}</span>${mark}</button>`;
   }
@@ -1652,9 +1726,9 @@ function calPick(key){
 }
 
 function markDone(i){LOG[i].state="asking";paintWeek()}
-function setLvl(i,v){LOG[i].state="done";LOG[i].lvl=v;track("day_done",{day:i+1,level:v});paintWeek()}
+function setLvl(i,v){LOG[i].state="done";LOG[i].lvl=v;histAdd(i,v);track("day_done",{day:i+1,level:v});paintWeek()}
 function markSkip(i){LOG[i].state="skip";LOG[i].lvl=null;paintWeek()}
-function reset(i){LOG[i]={state:"open",lvl:null};closed=false;$("rClose").innerHTML="";paintWeek();saveResult()}
+function reset(i){LOG[i]={state:"open",lvl:null};histRemove(i);closed=false;$("rClose").innerHTML="";paintWeek();saveResult()}
 
 /* ---- 週の締め：実施ログから予測タイムと必要週数を再計算 ---- */
 function closeWeek(){
@@ -2036,10 +2110,11 @@ async function buildShareCard(before){
 /* ============ やった内容のカード ============
    予測タイムだけでは投稿する動機にならない。実施した中身（種目・量・
    きつさ）と、今週どこまで進んだかを front に出す。 */
-async function buildTrainingCard(i){
+async function buildTrainingCard(i,mode){
   await ensureFonts();
   const d=WEEK[i], l=LOG[i]||{};
-  const W=1080,H=1350,PAD=84;
+  const story=mode==="story";
+  const W=1080,H=story?1920:1350,PAD=84;
   const c=document.createElement("canvas"); c.width=W; c.height=H;
   const x=c.getContext("2d");
   x.fillStyle="#0B0B0B"; x.fillRect(0,0,W,H);
@@ -2076,8 +2151,11 @@ async function buildTrainingCard(i){
   });
 
   const done=LOG.filter(v=>v.state==="done").length;
+  const st=histStats();
   const rows=[["今週の実施", done+" / "+WEEK.length+" 日"]];
   if(l.lvl) rows.push(["きつさ", LVLTXT[l.lvl]]);
+  if(st.streak>1) rows.push(["連続", st.streak+" 週"]);
+  if(st.sessions>1) rows.push(["ここまでの積み上げ", st.sessions+" 回 ／ "+Math.round(st.minutes/60*10)/10+" 時間"]);
   if(R && R.left!==null) rows.push([RACES[A.race].label+"まで", R.left+" 週"]);
   if(R) rows.push(["予測完走タイム", hms(R.total)]);
 
@@ -2103,7 +2181,9 @@ function trainingText(i){
   const done=LOG.filter(v=>v.state==="done").length;
   const t=[`第${Store.get("week")||1}週 DAY ${i+1}　${d.t}　${d.n}`];
   d.ex.slice(0,3).forEach(e=>t.push("・"+(e[1]?`${e[0]}（${e[1]}）`:e[0])));
+  const st=histStats();
   t.push(`今週の実施 ${done}/${WEEK.length}日${l.lvl?"／きつさ "+LVLTXT[l.lvl]:""}`);
+  if(st.sessions>1) t.push(`積み上げ ${st.sessions}回／${Math.round(st.minutes/60*10)/10}時間${st.streak>1?"／連続"+st.streak+"週":""}`);
   t.push(SITE_URL);
   return t.join("\n");
 }
@@ -2112,14 +2192,16 @@ function trainingText(i){
 async function shareTraining(i){
   track("training_share",{day:i+1});
   const text=trainingText(i);
-  let blob=null;
+  let blob=null, feedBlob=null;
   try{
-    const c=await buildTrainingCard(i);
-    blob=await new Promise(r=>c.toBlob(r,"image/png"));
+    const cs=await buildTrainingCard(i,"story");
+    blob=await new Promise(r=>cs.toBlob(r,"image/png"));
+    const cf=await buildTrainingCard(i,"feed");
+    feedBlob=await new Promise(r=>cf.toBlob(r,"image/png"));
   }catch(e){}
-  if(blob && typeof ME==="object" && ME && typeof MY_PROFILE==="object" && MY_PROFILE
+  if(feedBlob && typeof ME==="object" && ME && typeof MY_PROFILE==="object" && MY_PROFILE
      && confirm("ROXXのフィードにも投稿しますか？\n（キャンセルを押すと、他のアプリへの共有だけになります）")){
-    if(typeof publishTraining==="function"){ await publishTraining(blob,text,i); return }
+    if(typeof publishTraining==="function"){ await publishTraining(feedBlob,text,i); return }
   }
   if(blob){
     const file=new File([blob],"roxx-training.png",{type:"image/png"});
