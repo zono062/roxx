@@ -337,7 +337,7 @@ body{
 /* ---------- social（Instagram型） ---------- */
 body.hastab #app{padding-bottom:64px}
 body.hastab .tabbar{display:grid}
-body.hastab.signedin .acctbar,body.hastab .foot{display:none}
+body.hastab .foot{display:none}
 #s-social{padding:0 0 20px}
 .sotop{
   display:flex;justify-content:space-between;align-items:center;
@@ -692,9 +692,9 @@ body.hastab.signedin .acctbar,body.hastab .foot{display:none}
 .cpsheet{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end}
 .cpsheet[hidden]{display:none}
 .cpsheetbg{position:absolute;inset:0;background:rgba(0,0,0,.45)}
-.cpsheetbox{position:relative;width:100%;background:var(--bg,#111);border-radius:14px 14px 0 0;padding:16px 14px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px}
-.cpsheetbox b{font-size:13px;opacity:.7;padding:2px 2px 6px}
-.cpsheetbox button{padding:14px;border-radius:10px;border:1px solid rgba(128,128,128,.3);background:rgba(128,128,128,.10);color:inherit;font-size:14.5px;cursor:pointer}
+.cpsheetbox{position:absolute;left:0;right:0;bottom:0;width:100%;background:var(--paper);color:var(--ink);border-radius:14px 14px 0 0;padding:16px 14px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px}
+.cpsheetbox b{font-size:13px;color:var(--mute);padding:2px 2px 6px}
+.cpsheetbox button{padding:14px;border-radius:10px;border:1px solid var(--rule);background:var(--field);color:var(--ink);font-size:14.5px;cursor:pointer}
 .cpsheetbox button:disabled{opacity:.4}
 .cpsheetcancel{background:none!important;border-color:transparent!important;opacity:.7}
 
@@ -704,6 +704,18 @@ body.hastab.signedin .acctbar,body.hastab .foot{display:none}
 .authtab.on{opacity:1;border-bottom-color:currentColor}
 .authalt{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px}
 .authalt .solink{font-size:12.5px}
+
+/* ログイン画面（インスタと同じく独立した1画面） */
+.loginwrap{min-height:calc(100vh - 160px);display:flex;flex-direction:column;justify-content:center;padding:32px 28px;gap:10px}
+.loginlogo{text-align:center;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:34px;letter-spacing:8px;margin-bottom:6px}
+.loginlead{text-align:center;font-size:13px;color:var(--mute);margin-bottom:18px}
+.loginwrap .authinput{width:100%}
+.loginbtn{width:100%;padding:13px;border:0;border-radius:10px;background:var(--ink);color:var(--paper);font-size:15px;font-weight:700;cursor:pointer;margin-top:4px}
+.loginsub{background:none;border:0;color:var(--mute);font-size:12.5px;text-align:center;cursor:pointer;padding:10px 0}
+.loginsep{display:flex;align-items:center;gap:10px;color:var(--mute);font-size:11px;margin:18px 0 12px}
+.loginsep::before,.loginsep::after{content:"";flex:1;height:1px;background:var(--rule)}
+.loginalt{width:100%;padding:12px;border:1px solid var(--ink);border-radius:10px;background:none;color:var(--ink);font-size:14px;font-weight:600;cursor:pointer}
+.loginnote{font-size:11.5px;color:var(--mute);text-align:center;line-height:1.7;margin-top:14px}
 </style>
 </head>
 <body>
@@ -831,10 +843,7 @@ body.hastab.signedin .acctbar,body.hastab .foot{display:none}
 
 <div id="storyView"></div>
 
-<section class="acctbar" id="acctbar" hidden>
-  <div class="eyebrow">アカウント</div>
-  <div id="acct"></div>
-</section>
+
 
 <footer class="foot">
   <a href="./legal/tokushoho.html">特定商取引法に基づく表記</a>
@@ -1061,7 +1070,6 @@ const Q=[
 const $=id=>document.getElementById(id);
 const show=id=>{document.querySelectorAll(".screen").forEach(e=>e.classList.remove("on"));$(id).classList.add("on");
   // アカウント欄は結果を見たあとにだけ出す（最初の画面では情報量を増やさない）
-  const ab=$("acctbar"); if(ab) ab.hidden = !(id==="s-res"||id==="s-social");
   window.scrollTo(0,0)};
 
 function start(){track("start_diagnosis");step=0;show("s-q");renderQ()}

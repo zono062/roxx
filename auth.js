@@ -67,6 +67,7 @@ async function signInWithPassword() {
   }
   authMsg("");
   if (typeof track === "function") track("signin_password");
+  if (typeof goTab === "function") setTimeout(() => goTab("home"), 300);
 }
 
 /* 新規登録。このプロジェクトは確認メールが必須の設定になっている */
@@ -267,21 +268,18 @@ function paintAccount() {
   if (!ME) {
     const signup = AUTH_MODE === "signup";
     box.innerHTML = `
-      <div class="authtabs">
-        <button class="authtab${signup ? "" : " on"}" onclick="setAuthMode('signin')">ログイン</button>
-        <button class="authtab${signup ? " on" : ""}" onclick="setAuthMode('signup')">新規登録</button>
-      </div>
       <input class="authinput" id="authEmail" type="email" inputmode="email" autocomplete="email" placeholder="メールアドレス">
       <input class="authinput" id="authPass" type="password" autocomplete="${signup ? "new-password" : "current-password"}" placeholder="パスワード（8文字以上）">
-      <button class="btn" onclick="${signup ? "signUpWithPassword()" : "signInWithPassword()"}">${signup ? "登録する" : "ログイン"}</button>
+      <button class="loginbtn" onclick="${signup ? "signUpWithPassword()" : "signInWithPassword()"}">${signup ? "登録する" : "ログイン"}</button>
       <p class="authmsg" id="authMsg"></p>
-      <div class="authalt">
-        ${signup
-          ? `<span class="authnote">登録すると確認メールが届きます。リンクを押すと使えるようになります。</span>`
-          : `<button class="solink" onclick="resetPassword()">パスワードを忘れた</button>
-             <button class="solink" onclick="sendMagicLink()">メールのリンクでログイン</button>`}
-      </div>
-      <details class="notes"><summary>保存されるデータについて</summary><p class="authnote">身長・体重・年齢は本人しか見られない領域に保存されます。他の利用者に表示されることはありません。</p></details>`;
+      ${signup
+        ? `<p class="loginnote">登録すると確認メールが届きます。リンクを押すと使えるようになります。</p>
+           <button class="loginsub" onclick="setAuthMode('signin')">アカウントをお持ちですか？　ログイン</button>`
+        : `<button class="loginsub" onclick="resetPassword()">パスワードを忘れた場合</button>
+           <div class="loginsep">または</div>
+           <button class="loginalt" onclick="setAuthMode('signup')">新しいアカウントを作成</button>
+           <button class="loginsub" onclick="sendMagicLink()">メールのリンクでログイン</button>`}
+      <p class="loginnote">身長・体重・年齢は本人しか見られない領域に保存されます。他の利用者には表示されません。</p>`;
     return;
   }
   if (!MY_PROFILE) {

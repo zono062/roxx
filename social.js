@@ -30,13 +30,19 @@ let STORY_TIMER = null;
 /* ---------- シェル ----------
    ログイン済みならアプリの外枠はタブになる。診断は「プログラム」タブの中身。
    診断がまだの人はフィードが空なので、プログラムから開く。 */
-function goToLogin() {
-  goTab("program");
-  document.body.classList.remove("signedin");
-  setTimeout(() => {
-    const el = document.getElementById("acctbar");
-    if (el) { el.hidden = false; el.scrollIntoView({ behavior: "smooth", block: "center" }) }
-  }, 250);
+function goToLogin() { goTab("login") }
+
+/* ログインは独立した1画面にする（インスタ・Threadsと同じ扱い）。
+   下部に常設しない。診断は未ログインでも使えるので program だけは開放。 */
+function renderLogin() {
+  const gear = elx("soGear"); if (gear) gear.hidden = true;
+  elx("soView").innerHTML = `
+    <div class="loginwrap">
+      <div class="loginlogo">ROXX</div>
+      <p class="loginlead">記録を残して、同じ大会を目指す人とつながる。</p>
+      <div id="acct"></div>
+    </div>`;
+  if (typeof paintAccount === "function") paintAccount();
 }
 
 function enterShell() {
@@ -73,20 +79,14 @@ function goTab(t) {
   }
   show("s-social");
   const v = elx("soView");
-  if (t !== "cal" && (!sb || !ME || !MY_PROFILE)) {
-    const label = { home: "みんなの投稿", dm: "メッセージ", me: "自分のページ" }[t] || "この機能";
-    v.innerHTML = `<div class="guestpane">
-      <p class="guestlead">${label}はログインすると使えます。</p>
-      <p class="guestsub">メールアドレスだけで登録できます。パスワードはありません。</p>
-      <button class="btn" onclick="goToLogin()">ログイン / 新規登録</button>
-    </div>`;
-    const sub0 = elx("soTopSub"); if (sub0) sub0.textContent = "";
+  if (t !== "cal" && t !== "login" && (!sb || !ME || !MY_PROFILE)) {
+    renderLogin();
     return;
   }
-  v.scrollTop = 0;
   const sub = elx("soTopSub");
   if (sub) sub.textContent = { home: "", find: "さがす", dm: "メッセージ", me: MY_PROFILE ? "@" + MY_PROFILE.handle : "" }[t] || "";
   if (t === "home") { v.innerHTML = skeleton("読み込んでいます…"); loadHome(); loadNotifs() }
+  if (t === "login") { renderLogin(); return }
   if (t === "cal")  { if (typeof renderCalendar === "function") renderCalendar(); return }
   if (t === "find") renderFind();
   if (t === "post") renderCompose();
@@ -414,7 +414,6 @@ function openCompose() {
   show("s-social");
   document.querySelectorAll(".tabbtn").forEach(b => b.classList.remove("on"));
   renderCompose();
-  paintComposePhoto();
 }
 
 /* 写真は既定の流れ。無い状態を「まだ選んでいない」として見せる */
@@ -426,12 +425,26 @@ function setComposeMode(m) {
 }
 
 function openSourceSheet() {
-  const sheet = elx("cpSheet");
-  if (sheet) sheet.hidden = false;
+  closeSourceSheet();
+  // .screen に transform が掛かっており position:fixed の基準がその要素になるため、
+  // シートは body 直下に出す。
+  const el = document.createElement("div");
+  el.className = "cpsheet";
+  el.id = "cpSheet";
+  el.innerHTML = `
+    <div class="cpsheetbg" onclick="closeSourceSheet()"></div>
+    <div class="cpsheetbox">
+      <b>投稿の中身</b>
+      <button onclick="setComposeMode('card')" ${R ? "" : "disabled"}>診断結果のカード${R ? "" : "（診断が必要）"}</button>
+      <button onclick="setComposeMode('photo')">写真を選ぶ</button>
+      <button onclick="setComposeMode('text')">テキストだけ</button>
+      <button class="cpsheetcancel" onclick="closeSourceSheet()">キャンセル</button>
+    </div>`;
+  document.body.appendChild(el);
 }
 function closeSourceSheet() {
-  const sheet = elx("cpSheet");
-  if (sheet) sheet.hidden = true;
+  const el = document.getElementById("cpSheet");
+  if (el) el.remove();
 }
 
 /* 投稿画面：インスタの共有画面と同じ並び
@@ -467,16 +480,7 @@ function renderCompose() {
     </label>
     ${CP_MODE === "text" ? `<p class="cpnote">テキストだけの投稿はストーリーズに出せません。</p>` : ""}
 
-    <div class="cpsheet" id="cpSheet" hidden>
-      <div class="cpsheetbg" onclick="closeSourceSheet()"></div>
-      <div class="cpsheetbox">
-        <b>投稿の中身</b>
-        <button onclick="setComposeMode('card')" ${R ? "" : "disabled"}>診断結果のカード${R ? "" : "（診断が必要）"}</button>
-        <button onclick="setComposeMode('photo')">写真を選ぶ</button>
-        <button onclick="setComposeMode('text')">テキストだけ</button>
-        <button class="cpsheetcancel" onclick="closeSourceSheet()">キャンセル</button>
-      </div>
-    </div>`;
+  `;
 }
 
 async function publish(kind) {
