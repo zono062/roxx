@@ -337,7 +337,7 @@ body{
 /* ---------- social（Instagram型） ---------- */
 body.hastab #app{padding-bottom:64px}
 body.hastab .tabbar{display:grid}
-body.hastab .acctbar,body.hastab .foot{display:none}
+body.hastab.signedin .acctbar,body.hastab .foot{display:none}
 #s-social{padding:0 0 20px}
 .sotop{
   display:flex;justify-content:space-between;align-items:center;
@@ -673,6 +673,37 @@ body.hastab .acctbar,body.hastab .foot{display:none}
 .cptextprev,.cpcardprev{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:12.5px;opacity:.6;padding:24px;text-align:center}
 .posttext{margin:2px 0 0;padding:0 14px 4px;font-size:15px;line-height:1.75;white-space:pre-wrap}
 .post.textpost{padding-bottom:4px}
+
+/* 新規投稿：インスタの共有画面と同じ構造 */
+.cprow1{display:flex;gap:12px;padding:14px}
+.cpthumb{position:relative;flex:0 0 72px;width:72px;height:72px;border:1px solid rgba(128,128,128,.3);border-radius:4px;overflow:hidden;background:rgba(128,128,128,.12);color:inherit;cursor:pointer;padding:0}
+.cpthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.cpthumbt{display:flex;width:100%;height:100%;align-items:center;justify-content:center;font-size:24px;opacity:.6}
+.cpthumb em{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);color:#fff;font-size:10px;font-style:normal;padding:2px 0;text-align:center}
+.cprow1 .cpcap{flex:1;border:0;background:none;color:inherit;font-size:14px;line-height:1.7;resize:none;outline:none;font-family:inherit;padding:2px 0}
+.cpopt{display:flex;align-items:center;justify-content:space-between;padding:14px;border-top:1px solid rgba(128,128,128,.2);border-bottom:1px solid rgba(128,128,128,.2);font-size:14px;cursor:pointer}
+.cpopt input{position:absolute;opacity:0;pointer-events:none}
+.cpopt .sw{width:44px;height:26px;border-radius:999px;background:rgba(128,128,128,.4);position:relative;transition:background .15s;flex:0 0 44px}
+.cpopt .sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .15s}
+.cpopt input:checked + .sw{background:#3d7dfb}
+.cpopt input:checked + .sw::after{transform:translateX(18px)}
+.cpopt input:disabled + .sw{opacity:.35}
+.cpnote{padding:10px 14px 0;font-size:11.5px;opacity:.6;margin:0}
+.cpsheet{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end}
+.cpsheet[hidden]{display:none}
+.cpsheetbg{position:absolute;inset:0;background:rgba(0,0,0,.45)}
+.cpsheetbox{position:relative;width:100%;background:var(--bg,#111);border-radius:14px 14px 0 0;padding:16px 14px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px}
+.cpsheetbox b{font-size:13px;opacity:.7;padding:2px 2px 6px}
+.cpsheetbox button{padding:14px;border-radius:10px;border:1px solid rgba(128,128,128,.3);background:rgba(128,128,128,.10);color:inherit;font-size:14.5px;cursor:pointer}
+.cpsheetbox button:disabled{opacity:.4}
+.cpsheetcancel{background:none!important;border-color:transparent!important;opacity:.7}
+
+/* ログイン／新規登録 */
+.authtabs{display:flex;gap:6px;margin-bottom:12px}
+.authtab{flex:1;padding:9px 0;font-size:13.5px;font-weight:600;border:0;border-bottom:2px solid transparent;background:none;color:inherit;opacity:.55;cursor:pointer}
+.authtab.on{opacity:1;border-bottom-color:currentColor}
+.authalt{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px}
+.authalt .solink{font-size:12.5px}
 </style>
 </head>
 <body>

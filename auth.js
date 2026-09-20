@@ -41,6 +41,61 @@ function authBoot() {
 }
 
 /* ---------- サインイン ---------- */
+let AUTH_MODE = "signin";
+function setAuthMode(m) { AUTH_MODE = m; paintAccount() }
+
+function readCreds() {
+  const email = ($$("authEmail") ? $$("authEmail").value : "").trim();
+  const password = $$("authPass") ? $$("authPass").value : "";
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { authMsg("メールアドレスの形式を確認してください", true); return null }
+  if (password.length < 8) { authMsg("パスワードは8文字以上にしてください", true); return null }
+  return { email, password };
+}
+
+/* メールとパスワードでログイン */
+async function signInWithPassword() {
+  const c = readCreds(); if (!c) return;
+  authMsg("確認しています…");
+  const { error } = await sb.auth.signInWithPassword(c);
+  if (error) {
+    const m = /Email not confirmed/i.test(error.message)
+      ? "メールの確認がまだです。登録時に届いたメールのリンクを押してください。"
+      : /Invalid login credentials/i.test(error.message)
+        ? "メールアドレスかパスワードが違います。"
+        : error.message;
+    authMsg(m, true); return;
+  }
+  authMsg("");
+  if (typeof track === "function") track("signin_password");
+}
+
+/* 新規登録。このプロジェクトは確認メールが必須の設定になっている */
+async function signUpWithPassword() {
+  const c = readCreds(); if (!c) return;
+  authMsg("登録しています…");
+  const redirect = location.origin + location.pathname;
+  const { data, error } = await sb.auth.signUp({ email: c.email, password: c.password, options: { emailRedirectTo: redirect } });
+  if (error) {
+    const m = /already registered/i.test(error.message)
+      ? "このメールアドレスは登録済みです。ログインに切り替えてください。"
+      : error.message;
+    authMsg(m, true); return;
+  }
+  if (data && data.session) { authMsg(""); return }
+  authMsg(c.email + " に確認メールを送りました。リンクを押すとログインできます。");
+  if (typeof track === "function") track("signup_password");
+}
+
+/* パスワードの再設定メールを送る */
+async function resetPassword() {
+  const email = ($$("authEmail") ? $$("authEmail").value : "").trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { authMsg("先にメールアドレスを入力してください", true); return }
+  authMsg("送信しています…");
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  if (error) { authMsg("送信できませんでした：" + error.message, true); return }
+  authMsg(email + " に再設定用のメールを送りました。");
+}
+
 async function sendMagicLink() {
   const el = $$("authEmail");
   const email = (el ? el.value : "").trim();
@@ -201,6 +256,7 @@ async function syncIfSignedIn() {
 
 /* ---------- 表示 ---------- */
 function paintAccount() {
+  document.body.classList.toggle("signedin", !!(ME && MY_PROFILE));
   const box = $$("acct");
   if (!box) return;
 
@@ -209,11 +265,22 @@ function paintAccount() {
     return;
   }
   if (!ME) {
+    const signup = AUTH_MODE === "signup";
     box.innerHTML = `
-      <p class="authlead">記録を残すなら、メールだけ。<b>パスワードは不要です。</b></p>
+      <div class="authtabs">
+        <button class="authtab${signup ? "" : " on"}" onclick="setAuthMode('signin')">ログイン</button>
+        <button class="authtab${signup ? " on" : ""}" onclick="setAuthMode('signup')">新規登録</button>
+      </div>
       <input class="authinput" id="authEmail" type="email" inputmode="email" autocomplete="email" placeholder="メールアドレス">
-      <button class="btn" onclick="sendMagicLink()">ログイン用リンクを送る</button>
+      <input class="authinput" id="authPass" type="password" autocomplete="${signup ? "new-password" : "current-password"}" placeholder="パスワード（8文字以上）">
+      <button class="btn" onclick="${signup ? "signUpWithPassword()" : "signInWithPassword()"}">${signup ? "登録する" : "ログイン"}</button>
       <p class="authmsg" id="authMsg"></p>
+      <div class="authalt">
+        ${signup
+          ? `<span class="authnote">登録すると確認メールが届きます。リンクを押すと使えるようになります。</span>`
+          : `<button class="solink" onclick="resetPassword()">パスワードを忘れた</button>
+             <button class="solink" onclick="sendMagicLink()">メールのリンクでログイン</button>`}
+      </div>
       <details class="notes"><summary>保存されるデータについて</summary><p class="authnote">身長・体重・年齢は本人しか見られない領域に保存されます。他の利用者に表示されることはありません。</p></details>`;
     return;
   }

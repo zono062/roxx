@@ -30,6 +30,15 @@ let STORY_TIMER = null;
 /* ---------- シェル ----------
    ログイン済みならアプリの外枠はタブになる。診断は「プログラム」タブの中身。
    診断がまだの人はフィードが空なので、プログラムから開く。 */
+function goToLogin() {
+  goTab("program");
+  document.body.classList.remove("signedin");
+  setTimeout(() => {
+    const el = document.getElementById("acctbar");
+    if (el) { el.hidden = false; el.scrollIntoView({ behavior: "smooth", block: "center" }) }
+  }, 250);
+}
+
 function enterShell() {
   // 未ログインでもタブUIを外枠にする。診断は「プログラム」タブの中身。
   document.body.classList.add("hastab");
@@ -69,7 +78,7 @@ function goTab(t) {
     v.innerHTML = `<div class="guestpane">
       <p class="guestlead">${label}はログインすると使えます。</p>
       <p class="guestsub">メールアドレスだけで登録できます。パスワードはありません。</p>
-      <button class="btn" onclick="goTab('program');setTimeout(()=>document.getElementById('acctbar')?.scrollIntoView({behavior:'smooth'}),200)">ログインする</button>
+      <button class="btn" onclick="goToLogin()">ログイン / 新規登録</button>
     </div>`;
     const sub0 = elx("soTopSub"); if (sub0) sub0.textContent = "";
     return;
@@ -411,70 +420,71 @@ function openCompose() {
 /* 写真は既定の流れ。無い状態を「まだ選んでいない」として見せる */
 function setComposeMode(m) {
   CP_MODE = m;
-  if (m === "photo" && !SHOT) { pickPhoto(); setTimeout(paintComposePhoto, 600); return }
-  paintComposePhoto();
+  closeSourceSheet();
+  if (m === "photo" && !SHOT) { pickPhoto(); setTimeout(renderCompose, 600); return }
+  renderCompose();
 }
 
-function paintComposePhoto() {
-  const box = elx("cpPhoto");
-  if (!box) return;
-  const tabs = `
-    <div class="cpmodes">
-      ${[["card","カード"],["photo","写真"],["text","テキスト"]].map(([k,l]) =>
-        `<button class="cpmode${CP_MODE===k?" on":""}" onclick="setComposeMode('${k}')">${l}</button>`).join("")}
-    </div>`;
-  if (CP_MODE === "text") {
-    box.innerHTML = `${tabs}<div class="cptextprev"><span>テキストだけの投稿になります</span></div>`;
-    return;
-  }
-  if (CP_MODE === "photo" && SHOT) {
-    box.innerHTML = `${tabs}<img class="cpimg" src="${SHOT.src}" alt="">
-      <div class="cptools">
-        <button class="cptool" onclick="pickPhoto();setTimeout(paintComposePhoto,600)">写真を変える</button>
-        <button class="cptool" onclick="clearPhoto();setComposeMode('card')">外す</button>
-      </div>`;
-    return;
-  }
-  if (CP_MODE === "photo") {
-    box.innerHTML = `${tabs}<button class="cpempty" onclick="pickPhoto();setTimeout(paintComposePhoto,600)">
-        <span class="cpemptyicon">▢</span><b>写真を選ぶ</b>
-        <em>自分の写真を背景にすると届きやすくなります</em></button>`;
-    return;
-  }
-  box.innerHTML = `${tabs}<div class="cpcardprev"><span>${R ? "診断結果のカードを投稿します" : "先に診断を終えてください"}</span></div>`;
+function openSourceSheet() {
+  const sheet = elx("cpSheet");
+  if (sheet) sheet.hidden = false;
+}
+function closeSourceSheet() {
+  const sheet = elx("cpSheet");
+  if (sheet) sheet.hidden = true;
 }
 
+/* 投稿画面：インスタの共有画面と同じ並び
+   （上部バー／サムネイル＋キャプションの1行／ストーリーズにもシェアのトグル） */
 function renderCompose() {
-  const gear=elx("soGear"); if(gear) gear.hidden=true;
+  const gear = elx("soGear"); if (gear) gear.hidden = true;
   if (!R && CP_MODE === "card") CP_MODE = "text";
-  // インスタの新規投稿と同じ並び：上部バー（キャンセル／タイトル／シェア）→ プレビュー → キャプション → 設定
+  const cap = elx("cpCap") ? elx("cpCap").value : "";
+
+  const thumb = CP_MODE === "photo" && SHOT
+    ? `<img src="${SHOT.src}" alt="">`
+    : CP_MODE === "text"
+      ? `<span class="cpthumbt">T</span>`
+      : `<span class="cpthumbt">◎</span>`;
+
   elx("soView").innerHTML = `
     <div class="cpbar">
-      <button class="cpcancel" onclick="goTab('home')">キャンセル</button>
+      <button class="cpcancel" onclick="goTab('home')">←</button>
       <b>新規投稿</b>
       <button class="cpshare" id="cpPost" onclick="publish('post')">シェア</button>
     </div>
-    <div class="cppreview" id="cpPhoto"></div>
-    <div class="cpbody">
-      <textarea class="cpcap" id="cpCap" rows="3" maxlength="300" placeholder="キャプションを入力…"></textarea>
-      <label class="cprowopt">
-        <span>おすすめにも出す</span>
-        <input type="checkbox" id="cpPublic" checked>
-      </label>
-      <button class="cprowopt cpstorybtn" id="cpStory" onclick="publish('story')">
-        <span>ストーリーに出す<em>24時間で消えます</em></span>
-        <i>›</i>
-      </button>
+
+    <div class="cprow1">
+      <button class="cpthumb" onclick="openSourceSheet()">${thumb}<em>変更</em></button>
+      <textarea class="cpcap" id="cpCap" rows="4" maxlength="300"
+        placeholder="キャプションを入力…">${escHtml(cap)}</textarea>
+    </div>
+
+    <label class="cpopt">
+      <span>ストーリーズにもシェア</span>
+      <input type="checkbox" id="cpStoryToo" ${CP_MODE === "text" ? "disabled" : ""}>
+      <i class="sw"></i>
+    </label>
+    ${CP_MODE === "text" ? `<p class="cpnote">テキストだけの投稿はストーリーズに出せません。</p>` : ""}
+
+    <div class="cpsheet" id="cpSheet" hidden>
+      <div class="cpsheetbg" onclick="closeSourceSheet()"></div>
+      <div class="cpsheetbox">
+        <b>投稿の中身</b>
+        <button onclick="setComposeMode('card')" ${R ? "" : "disabled"}>診断結果のカード${R ? "" : "（診断が必要）"}</button>
+        <button onclick="setComposeMode('photo')">写真を選ぶ</button>
+        <button onclick="setComposeMode('text')">テキストだけ</button>
+        <button class="cpsheetcancel" onclick="closeSourceSheet()">キャンセル</button>
+      </div>
     </div>`;
-  paintComposePhoto();
 }
 
 async function publish(kind) {
   const cap = (elx("cpCap") ? elx("cpCap").value : "").trim();
-  const btn = elx(kind === "story" ? "cpStory" : "cpPost");
+  const btn = elx("cpPost");
   const textOnly = CP_MODE === "text";
+  const alsoStory = elx("cpStoryToo") ? elx("cpStoryToo").checked : false;
   if (textOnly && !cap) { alert("本文を入力してください"); return }
-  if (textOnly && kind === "story") { alert("ストーリーには画像が必要です。カードか写真を選んでください。"); return }
   if (btn) { btn.disabled = true; btn.textContent = "投稿中…" }
   try {
     const id = crypto.randomUUID();
@@ -488,22 +498,23 @@ async function publish(kind) {
       if (upErr) throw upErr;
     }
     const caption = cap || (R ? `予測 ${hms(R.total)} ／ 必要 ${R.need}週` : "");
-    const table = kind === "story" ? "stories" : "posts";
-    const pub = elx("cpPublic") ? elx("cpPublic").checked : true;
-    const row = kind === "story"
-      ? { id, author_id: ME.id, image_path: path, kind: "result", caption }
-      : {
-          id, author_id: ME.id, image_path: path, kind: "training", caption,
-          visibility: pub ? "public" : "followers",
-          race: (typeof A === "object" && A && A.race) ? A.race : null
-        };
-    const { error } = await sb.from(table).insert(row);
+    const { error } = await sb.from("posts").insert({
+      id, author_id: ME.id, image_path: path, kind: "training", caption,
+      visibility: "public",
+      race: (typeof A === "object" && A && A.race) ? A.race : null
+    });
     if (error) throw error;
-    if (typeof track === "function") track(kind === "story" ? "story_post" : "feed_post", { mode: CP_MODE });
+
+    if (alsoStory && path) {
+      await sb.from("stories").insert({
+        id: crypto.randomUUID(), author_id: ME.id, image_path: path, kind: "result", caption
+      });
+    }
+    if (typeof track === "function") track("feed_post", { mode: CP_MODE, story: alsoStory });
     goTab("home");
   } catch (e) {
     alert("投稿できませんでした：" + (e.message || e));
-    if (btn) { btn.disabled = false; btn.textContent = kind === "story" ? "ストーリーに出す" : "シェア" }
+    if (btn) { btn.disabled = false; btn.textContent = "シェア" }
   }
 }
 
