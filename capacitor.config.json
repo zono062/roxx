@@ -1,0 +1,8 @@
+{
+  "appId": "com.zono062.roxx",
+  "appName": "ROXX",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "always"
+  }
+}

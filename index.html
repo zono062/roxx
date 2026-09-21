@@ -1512,7 +1512,12 @@ const PAYMENT_LINK = "https://buy.stripe.com/7sY7sL4pE32t5pA12geEo00";
 })();
 let PAID = Store.get("paid")===true;
 
+/* iOSアプリ内では外部決済（Stripe）を出さない（App Store規約3.1.1）。
+   アプリ内課金（IAP）に差し替えるまでは購入導線自体を隠す。 */
+const IS_NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+
 function checkout(){
+  if(IS_NATIVE) return;
   track("checkout_click");
   if(!PAYMENT_LINK){ alert("決済の準備中です。もう少しお待ちください。"); return }
   location.href=PAYMENT_LINK;
@@ -1573,6 +1578,11 @@ function openWeekCard(n,t){
 
 /* 課金済みなら決済導線を出さない（二重課金の防止） */
 function paintCta(){
+  if(IS_NATIVE && !PAID){
+    const b=$("ctaBtn"); if(b) b.hidden=true;
+    const p=$("ctaPrice"); if(p) p.innerHTML='<span>第2週以降のメニューは準備中です</span>';
+    return;
+  }
   if(!PAID) return;
   $("ctaPrice").innerHTML='<span>ご利用中／第2週以降が解除されています</span>';
   const b=$("ctaBtn");
