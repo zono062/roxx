@@ -1518,18 +1518,22 @@ function track(name,params){
    Managed Payments はオフ（取引あたり3.5%の上乗せを避けるため）。 */
 const PAYMENT_LINK = "https://buy.stripe.com/7sY7sL4pE32t5pA12geEo00";
 
-/* 決済からの復帰：?paid=1 を検出してフラグを立て、クエリを消す */
+/* 決済からの復帰。
+   以前は ?paid=1 が付いているだけで有料版を開いていたが、URLを知っていれば誰でも
+   開けてしまうため廃止した。課金状態はサーバー側（Stripeの支払い通知→Supabase）で
+   記録したものだけを信じる。ここでは「確認中」を出すだけにする。 */
+let PAID = false;
+Store.del("paid");                       // 旧方式で端末に残ったフラグは無効化する
 (function(){
   try{
     const params=new URLSearchParams(location.search);
     if(params.get("paid")==="1"){
-      Store.set("paid",true);
-      track("purchase",{value:980,currency:"JPY"});
+      track("checkout_return");
       history.replaceState({},"",location.pathname);
+      window.__CHECKOUT_RETURN=true;     // ログイン状態が分かった時点で waitForEntitlement を呼ぶ
     }
   }catch(e){}
 })();
-let PAID = Store.get("paid")===true;
 
 /* iOSアプリ内では外部決済（Stripe）を出さない（App Store規約3.1.1）。
    アプリ内課金（IAP）に差し替えるまでは購入導線自体を隠す。 */
@@ -1602,7 +1606,42 @@ function checkout(){
   if(IS_NATIVE) return;
   track("checkout_click");
   if(!PAYMENT_LINK){ alert("決済の準備中です。もう少しお待ちください。"); return }
-  location.href=PAYMENT_LINK;
+  // 誰の購入かをサーバーで特定するため、ログインしてから買ってもらう
+  if(typeof ME!=="object" || !ME || !ME.id){
+    alert("購入の前にログインしてください。支払いをアカウントに結びつけるためです。");
+    if(typeof goToLogin==="function") goToLogin();
+    return;
+  }
+  const u=new URL(PAYMENT_LINK);
+  u.searchParams.set("client_reference_id", ME.id);
+  if(ME.email) u.searchParams.set("prefilled_email", ME.email);
+  location.href=u.toString();
+}
+
+/* 課金状態はサーバー（public.entitlements）の記録だけで決める */
+function setPaid(v){
+  const changed = PAID!==!!v;
+  PAID=!!v;
+  if(changed && typeof R==="object" && R){ renderNextWeeks(); paintCta(); }
+}
+async function refreshEntitlement(){
+  if(typeof sb!=="object" || !sb || typeof ME!=="object" || !ME){ setPaid(false); return false }
+  try{
+    const { data, error } = await sb.from("entitlements")
+      .select("status,current_period_end").eq("user_id", ME.id).maybeSingle();
+    const ok = !error && !!data && ["active","trialing"].includes(data.status)
+      && (!data.current_period_end || Date.parse(data.current_period_end) > Date.now());
+    setPaid(ok);
+    return ok;
+  }catch(e){ setPaid(false); return false }
+}
+/* 決済から戻った直後は、支払い通知の到着を少し待って確認する */
+async function waitForEntitlement(){
+  for(let i=0;i<10;i++){
+    if(await refreshEntitlement()){ alert("お支払いを確認しました。第2週以降が開きました。"); return }
+    await new Promise(r=>setTimeout(r,3000));
+  }
+  alert("お支払いの反映に時間がかかっています。しばらくしてから開き直してください。");
 }
 
 let WEEK=[], LOG=[], closed=false;

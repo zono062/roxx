@@ -155,6 +155,10 @@ async function afterSignIn() {
   await loadProfile();
   if (!MY_PROFILE) { paintAccount(); return }   // プロフィール未作成
   await syncState();
+  if (typeof refreshEntitlement === "function") {
+    if (window.__CHECKOUT_RETURN) { window.__CHECKOUT_RETURN = false; waitForEntitlement() }
+    else refreshEntitlement();
+  }
   paintAccount();
   if (typeof enterShell === "function") enterShell();
   if (typeof track === "function") track("signed_in");
@@ -192,6 +196,10 @@ async function createProfile() {
   }
   await loadProfile();
   await syncState();
+  if (typeof refreshEntitlement === "function") {
+    if (window.__CHECKOUT_RETURN) { window.__CHECKOUT_RETURN = false; waitForEntitlement() }
+    else refreshEntitlement();
+  }
   paintAccount();
   if (typeof enterShell === "function") enterShell();
   authMsg("");
@@ -214,7 +222,6 @@ function pullDown(remote) {
     Store.set("answers", remote.answers);
     Store.set("result", remote.result);
     Store.set("week", remote.week);
-    if (remote.paid === true) Store.set("paid", true);
     Store.set("updated", Date.parse(remote.updated_at));
     if (typeof restore === "function") restore();
   } catch (e) {}
@@ -229,7 +236,6 @@ async function pushUp() {
   await sb.from("athlete_state").upsert({
     user_id: ME.id, answers, result,
     week: Store.get("week") || 1,
-    paid: Store.get("paid") === true,
     updated_at: now
   });
 
@@ -258,8 +264,7 @@ async function resetServerState() {
   try {
     await sb.from("athlete_state").upsert({
       user_id: ME.id, answers: {}, result: {}, week: 1,
-      paid: Store.get("paid") === true,
-      updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString()
     });
     await sb.from("athlete_public").delete().eq("user_id", ME.id);
     await sb.from("training_logs").delete().eq("user_id", ME.id);
