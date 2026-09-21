@@ -42,6 +42,16 @@ function authBoot() {
 
 /* ---------- サインイン ---------- */
 let AUTH_MODE = "signin";
+const TERMS_VERSION = "2026-08-29";     // legal/terms.html の日付
+const PRIVACY_VERSION = "2026-09-09";   // legal/privacy.html の最終更新
+
+function togglePassword() {
+  const el = $$("authPass"), eye = $$("pwEye");
+  if (!el) return;
+  const show = el.type === "password";
+  el.type = show ? "text" : "password";
+  if (eye) { eye.textContent = show ? "隠す" : "表示"; eye.setAttribute("aria-label", show ? "パスワードを隠す" : "パスワードを表示") }
+}
 function setAuthMode(m) { AUTH_MODE = m; paintAccount() }
 
 function readCreds() {
@@ -74,9 +84,15 @@ async function signInWithPassword() {
 /* 新規登録。このプロジェクトは確認メールが必須の設定になっている */
 async function signUpWithPassword() {
   const c = readCreds(); if (!c) return;
+  if (!($$("authAgree") && $$("authAgree").checked)) {
+    authMsg("利用規約とプライバシーポリシーへの同意が必要です", true); return;
+  }
   authMsg("登録しています…");
   const redirect = location.origin + location.pathname;
-  const { data, error } = await sb.auth.signUp({ email: c.email, password: c.password, options: { emailRedirectTo: redirect } });
+  const { data, error } = await sb.auth.signUp({ email: c.email, password: c.password, options: {
+    emailRedirectTo: redirect,
+    data: { terms_version: TERMS_VERSION, privacy_version: PRIVACY_VERSION, agreed_at: new Date().toISOString() }
+  } });
   if (error) {
     const m = /already registered/i.test(error.message)
       ? "このメールアドレスは登録済みです。ログインに切り替えてください。"
@@ -270,7 +286,14 @@ function paintAccount() {
     const signup = AUTH_MODE === "signup";
     box.innerHTML = `
       <input class="authinput" id="authEmail" type="email" inputmode="email" autocomplete="email" placeholder="メールアドレス">
-      <input class="authinput" id="authPass" type="password" autocomplete="${signup ? "new-password" : "current-password"}" placeholder="パスワード（8文字以上）">
+      <div class="pwwrap">
+        <input class="authinput" id="authPass" type="password" autocomplete="${signup ? "new-password" : "current-password"}" placeholder="パスワード（8文字以上）">
+        <button type="button" class="pweye" id="pwEye" aria-label="パスワードを表示" onclick="togglePassword()">表示</button>
+      </div>
+      ${signup ? `<label class="agree">
+        <input type="checkbox" id="authAgree">
+        <span><a href="./legal/terms.html" target="_blank" rel="noopener">利用規約</a>と<a href="./legal/privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>に同意します</span>
+      </label>` : ""}
       <button class="loginbtn" onclick="${signup ? "signUpWithPassword()" : "signInWithPassword()"}">${signup ? "登録する" : "ログイン"}</button>
       <p class="authmsg" id="authMsg"></p>
       ${signup
