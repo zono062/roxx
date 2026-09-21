@@ -68,6 +68,7 @@ async function signInWithPassword() {
   authMsg("");
   if (typeof track === "function") track("signin_password");
   if (typeof goTab === "function") setTimeout(() => goTab("home"), 300);
+  if (typeof maybeOfferInstall === "function") maybeOfferInstall("signin");
 }
 
 /* 新規登録。このプロジェクトは確認メールが必須の設定になっている */

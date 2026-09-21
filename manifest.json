@@ -3,7 +3,7 @@
   "name": "ROXX — HYROX完走プログラム",
   "short_name": "ROXX",
   "description": "8つの質問で、予測完走タイム・本番で止まる箇所・必要な準備週数が出る。",
-  "start_url": "./",
+  "start_url": "./?source=pwa",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",

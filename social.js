@@ -32,6 +32,35 @@ let STORY_TIMER = null;
    診断がまだの人はフィードが空なので、プログラムから開く。 */
 function goToLogin() { goTab("login") }
 
+let PTR_READY = false;
+function initPullToRefresh() {
+  if (PTR_READY) return;
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  if (!standalone) return;
+  PTR_READY = true;
+  const badge = document.createElement("div");
+  badge.className = "ptr"; badge.textContent = "↓ 引っ張って更新";
+  document.body.appendChild(badge);
+  let startY = null, pulled = 0;
+  const TH = 70;
+  window.addEventListener("touchstart", e => {
+    const onFeed = document.getElementById("s-social")?.classList.contains("on") && ["home", "me"].includes(TAB);
+    startY = (onFeed && window.scrollY <= 0) ? e.touches[0].clientY : null;
+  }, { passive: true });
+  window.addEventListener("touchmove", e => {
+    if (startY === null) return;
+    pulled = Math.max(0, e.touches[0].clientY - startY);
+    const y = Math.min(pulled, TH + 20) - 60;
+    badge.style.transform = `translate(-50%, ${y}px)`;
+    badge.textContent = pulled > TH ? "↻ 離して更新" : "↓ 引っ張って更新";
+  }, { passive: true });
+  window.addEventListener("touchend", () => {
+    if (startY !== null && pulled > TH) { badge.textContent = "更新しています…"; goTab(TAB) }
+    startY = null; pulled = 0;
+    setTimeout(() => { badge.style.transform = "translate(-50%, -60px)" }, 400);
+  });
+}
+
 /* ログインは独立した1画面にする（インスタ・Threadsと同じ扱い）。
    下部に常設しない。診断は未ログインでも使えるので program だけは開放。 */
 function renderLogin() {
@@ -50,7 +79,8 @@ function enterShell() {
   document.body.classList.add("hastab");
   const signedIn = !!(sb && ME && MY_PROFILE);
   if (typeof routeFromHash === "function" && routeFromHash()) return;
-  goTab(signedIn && R ? "home" : "program");
+  goTab(signedIn ? "home" : "program");
+  if (signedIn) initPullToRefresh();
 }
 function leaveShell() {
   document.body.classList.remove("hastab");
@@ -741,6 +771,8 @@ function renderSettings() {
   elx("soView").innerHTML = `
     <div class="sopad">
       <button class="ghost sm" onclick="renderMe()">← 自分のページへ</button>
+      ${typeof canOfferInstall === "function" && canOfferInstall()
+        ? `<button class="ghost" style="margin-top:16px" onclick="showInstallSheet('menu')">ホーム画面に追加する</button>` : ""}
       <h3 class="soh" style="margin-top:20px">通知</h3>
       <div id="pushState"></div>
       <h3 class="soh" style="margin-top:24px">設定</h3>
