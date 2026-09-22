@@ -71,7 +71,7 @@ async function signInWithPassword() {
     const m = /Email not confirmed/i.test(error.message)
       ? "メールの確認がまだです。登録時に届いたメールのリンクを押してください。"
       : /Invalid login credentials/i.test(error.message)
-        ? "メールアドレスかパスワードが違います。"
+        ? "メールアドレスかパスワードが違います。メールのリンクで登録した場合はパスワードが未設定なので、「パスワードを忘れた場合」から設定してください。"
         : error.message;
     authMsg(m, true); return;
   }
@@ -100,6 +100,13 @@ async function signUpWithPassword() {
     authMsg(m, true); return;
   }
   if (data && data.session) { authMsg(""); return }
+  // 登録済みのアドレスだと Supabase はエラーを返さず、メールも送らない（identities が空で返る）
+  if (data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    setAuthMode("signin");
+    if ($$("authEmail")) $$("authEmail").value = c.email;
+    authMsg("このメールアドレスは登録済みです。ログインしてください。パスワードがわからない場合は「パスワードを忘れた場合」から設定できます。", true);
+    return;
+  }
   authMsg(c.email + " に確認メールを送りました。リンクを押すとログインできます。");
   if (typeof track === "function") track("signup_password");
 }
