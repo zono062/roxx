@@ -1494,10 +1494,12 @@ function saveResult(){ Store.set("result",{total:R.total,need:R.need,over:R.over
 
 /* ============ 計測（GA4） ============ */
 /* 測定IDが決まったらこの1行を埋める。空のままでも track() は安全に何もしない */
-const GA4_ID = "";           // 例: G-XXXXXXXXXX
+const GA4_ID = "G-Y3JV54SLE5";
 
 (function loadAnalytics(){
   if(!GA4_ID) return;
+  // 手元の確認（localhost）は集計に混ぜない
+  if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && !/[?&]ga_debug=1/.test(location.search)) return;
   window.dataLayer=window.dataLayer||[];
   window.gtag=function(){dataLayer.push(arguments)};
   gtag("js",new Date()); gtag("config",GA4_ID);
