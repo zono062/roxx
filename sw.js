@@ -1,6 +1,6 @@
 /* 最小のservice worker：ネットワーク優先＋キャッシュ退避。
    オフライン対応は目的ではなく、ホーム画面起動の要件を満たすためのもの。 */
-const C = "hx-v4";
+const C = "hx-v5";
 const ASSETS = [
   "./", "./index.html", "./manifest.json",
   "./icon-192.png", "./icon-512.png",
@@ -23,8 +23,10 @@ self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
   if (new URL(req.url).origin !== location.origin) return;
+  // ブラウザのHTTPキャッシュ（GitHub Pages は10分）を使わず毎回サーバーに確認する。
+  // 更新直後に新しいHTMLと古いJSが混ざるのを防ぐため（変更がなければ304で軽い）
   e.respondWith(
-    fetch(req)
+    fetch(req, { cache: "no-cache" })
       .then(res => {
         const copy = res.clone();
         caches.open(C).then(c => c.put(req, copy)).catch(() => {});
