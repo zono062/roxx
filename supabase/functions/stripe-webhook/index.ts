@@ -4,16 +4,19 @@
 //
 // 通知は署名を検証してから処理する。署名が合わないものは何も書かずに 400 を返す。
 // 購入時にアプリが渡した client_reference_id（= Supabase のユーザーID）で利用者を特定する。
+//
+// Stripe の秘密鍵は使わない（通知の中身だけで判定できるため）。必要な設定は
+// STRIPE_WEBHOOK_SECRET（通知の署名確認用）1つだけ。
 import Stripe from "npm:stripe@16.12.0";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Secrets に貼る際に末尾の改行が混ざりやすいので取り除く
-const stripeKey = (Deno.env.get("STRIPE_SECRET_KEY") ?? "").trim();
 const webhookSecret = (Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "").trim();
 
-const stripe = new Stripe(stripeKey, { httpClient: Stripe.createFetchHttpClient() });
+// 署名の検証はローカル計算だけで API は呼ばないため、APIキーは不要（ダミーで初期化する）
+const stripe = new Stripe("sk_unused", { httpClient: Stripe.createFetchHttpClient() });
 const cryptoProvider = Stripe.createSubtleCryptoProvider();
 
 const sb = createClient(
@@ -47,8 +50,8 @@ async function saveFromSubscription(userId: string, sub: Stripe.Subscription): P
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ ok: false, error: "method not allowed" }, 405);
-  if (!stripeKey || !webhookSecret) {
-    console.error("STRIPE_SECRET_KEY または STRIPE_WEBHOOK_SECRET が未設定");
+  if (!webhookSecret) {
+    console.error("STRIPE_WEBHOOK_SECRET が未設定");
     return json({ ok: false, error: "not configured" }, 500);
   }
 
@@ -71,12 +74,17 @@ Deno.serve(async (req) => {
         console.error("client_reference_id が無い購入", { session: s.id });
         return json({ ok: true, skipped: "no user" });
       }
-      if (!s.subscription) return json({ ok: true, skipped: "not a subscription" });
-      const subId = typeof s.subscription === "string" ? s.subscription : s.subscription.id;
-      const sub = await stripe.subscriptions.retrieve(subId);
-      // 以降の更新通知で利用者を引けるよう、サブスクリプション側にもユーザーIDを残す
-      await stripe.subscriptions.update(subId, { metadata: { supabase_user_id: userId } });
-      await saveFromSubscription(userId, sub);
+      if (s.payment_status !== "paid") return json({ ok: true, skipped: "not paid" });
+      const subId = typeof s.subscription === "string" ? s.subscription : s.subscription?.id ?? null;
+      const { error } = await sb.from("entitlements").upsert({
+        user_id: userId,
+        status: "active",
+        current_period_end: null,              // 期間は後続の customer.subscription.* で埋まる
+        stripe_customer: typeof s.customer === "string" ? s.customer : s.customer?.id ?? null,
+        stripe_subscription: subId,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) throw error;
       return json({ ok: true });
     }
 
@@ -86,11 +94,9 @@ Deno.serve(async (req) => {
       event.type === "customer.subscription.created"
     ) {
       const sub = event.data.object as Stripe.Subscription;
-      let userId = sub.metadata?.supabase_user_id ?? "";
-      if (!UUID_RE.test(userId)) {
-        const { data } = await sb.from("entitlements").select("user_id").eq("stripe_subscription", sub.id).maybeSingle();
-        userId = data?.user_id ?? "";
-      }
+      // 購入時（checkout.session.completed）に記録したサブスクIDから利用者を引く
+      const { data } = await sb.from("entitlements").select("user_id").eq("stripe_subscription", sub.id).maybeSingle();
+      const userId = data?.user_id ?? "";
       if (!UUID_RE.test(userId)) return json({ ok: true, skipped: "unknown subscription" });
       await saveFromSubscription(userId, sub);
       return json({ ok: true });
