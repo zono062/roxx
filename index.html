@@ -588,7 +588,8 @@ body.hastab .foot{display:none}
 .megrid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
 .megcell{position:relative;aspect-ratio:1/1;padding:0;border:0;background:#111;overflow:hidden;cursor:pointer}
 .megcell img{width:100%;height:100%;object-fit:cover;display:block}
-.megtext{display:flex;width:100%;height:100%;align-items:center;justify-content:center;padding:8px;font-size:11px;opacity:.7;text-align:center}
+.megcell:has(.megtext){background:#f2f2f2}
+.megtext{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:5;overflow:hidden;width:100%;height:100%;padding:10px;font-size:11px;line-height:1.5;color:var(--ink);text-align:left;white-space:pre-wrap;word-break:break-all}
 
 /* ユーザー行（おすすめ／検索結果） */
 .urow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)}

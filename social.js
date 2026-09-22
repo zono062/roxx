@@ -708,9 +708,11 @@ async function renderMe() {
     await Promise.all(myPosts.map(async x => { if (x.image_path) x.url = await signed(x.image_path) }));
   } catch (e) { console.error("renderMe failed", e) }
 
-  // 自己紹介は診断結果から作る（目標レースと予測タイム）
+  // 自己紹介：本人が書いたものがあればそれを出す（Instagram と同じ）。
+  // 無ければ診断結果から作る（目標レースと予測タイム）
   const bio = [];
-  if (typeof R === "object" && R && typeof A === "object" && A) {
+  if (MY_PROFILE.bio) bio.push(...String(MY_PROFILE.bio).split("\n").slice(0, 4));
+  else if (typeof R === "object" && R && typeof A === "object" && A) {
     const race = (typeof RACES === "object" && RACES[A.race]) ? RACES[A.race] : null;
     if (race && race.date) bio.push(`${race.label}　${race.date.replace(/-/g, ".")}`);
     if (R.total) bio.push(`予測 ${hms(R.total)}／必要な準備 ${R.need}週`);
@@ -726,7 +728,7 @@ async function renderMe() {
   const grid = myPosts.length
     ? `<div class="megrid">${myPosts.map(p => `
         <button class="megcell" onclick="openPost('${p.id}')">
-          ${p.url ? `<img src="${p.url}" alt="">` : `<span class="megtext">${escHtml((p.caption || "").slice(0, 40))}</span>`}
+          ${p.url ? `<img src="${p.url}" alt="">` : `<span class="megtext">${escHtml((p.caption || "").slice(0, 80))}</span>`}
         </button>`).join("")}</div>`
     : `<div class="meempty">
          <div class="meemptyicon">▦</div>
